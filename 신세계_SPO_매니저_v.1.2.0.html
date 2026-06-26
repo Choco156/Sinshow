@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>매체 합치기</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' ry='7' fill='black'/><text x='16' y='23' font-family='Arial Black,sans-serif' font-size='20' font-weight='900' fill='%23FF1493' text-anchor='middle'>S</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f5f4f0;
+    --white: #ffffff;
+    --border: #e0ddd6;
+    --text: #1a1a1a;
+    --muted: #999;
+    --accent: #2d5be3;
+    --accent-light: #eef1fd;
+    --green: #1a9e5c;
+    --green-light: #e8f7f0;
+    --red: #d93025;
+    --red-light: #fdecea;
+    --tag-bg: #1a1a1a;
+    --tag-text: #f5f4f0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px 60px;
+  }
+
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  .header { margin-bottom: 36px; }
+
+  .header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .title-group h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .title-group p {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 300;
+  }
+
+  .schema-pill {
+    display: flex;
+    align-items: center;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+
+  .schema-pill span {
+    padding: 6px 10px;
+    border-right: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .schema-pill span:last-child { border-right: none; }
+  .schema-pill span.hi { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .schema-pill span.dim { color: #ccc; }
+
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 0.7rem;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  .media-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+
+  .media-tag .num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: #666;
+    min-width: 16px;
+  }
+
+  .media-tag .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #444;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .media-tag.has-file .dot {
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade8066;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    background: var(--bg);
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+
+  .drop-icon { font-size: 2rem; margin-bottom: 10px; }
+
+  .drop-zone p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .drop-zone strong { color: var(--accent); font-weight: 500; }
+
+  .file-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+  }
+
+  .file-table th {
+    text-align: left;
+    font-size: 0.7rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 0 10px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .file-table td {
+    padding: 9px 10px;
+    font-size: 0.83rem;
+    border-bottom: 1px solid var(--bg);
+    vertical-align: middle;
+  }
+
+  .file-table tr:last-child td { border-bottom: none; }
+
+  .file-table tr { animation: slideIn 0.15s ease; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .f-num { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); width: 36px; }
+  .f-media { width: 200px; }
+
+  .media-badge {
+    display: inline-flex;
+    align-items: center;
+    background: var(--green-light);
+    color: var(--green);
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .media-badge.unset { background: #fff3e0; color: #e65100; }
+
+  .f-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 320px;
+  }
+
+  .f-rows {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: right;
+    width: 70px;
+  }
+
+  .f-remove { width: 32px; text-align: center; }
+
+  .btn-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 1rem;
+    padding: 2px 6px; border-radius: 4px;
+    transition: all 0.15s; line-height: 1;
+  }
+
+  .btn-remove:hover { background: var(--red-light); color: var(--red); }
+
+  .progress-wrap { margin-top: 20px; }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .progress-meta span {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .progress-meta .count { font-weight: 500; color: var(--text); }
+
+  .bar-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #6b8ef5);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .run-area { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .btn-run {
+    flex: 1; min-width: 160px;
+    padding: 13px 24px;
+    background: var(--accent); color: white;
+    border: none; border-radius: 8px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.9rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+  }
+
+  .btn-run:hover:not(:disabled) {
+    background: #1d48c8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(45,91,227,0.3);
+  }
+
+  .btn-run:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-reset {
+    padding: 13px 18px;
+    background: white; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+  }
+
+  .btn-reset:hover { border-color: var(--text); color: var(--text); }
+
+  .status {
+    display: none; margin-top: 14px;
+    padding: 12px 16px; border-radius: 8px;
+    font-size: 0.83rem; line-height: 1.5;
+  }
+
+  .status.success { display: block; background: var(--green-light); color: var(--green); border: 1px solid #b2dfce; }
+  .status.error   { display: block; background: var(--red-light);   color: var(--red);   border: 1px solid #f5c6c3; }
+  .status.loading { display: block; background: var(--accent-light); color: var(--accent); border: 1px solid #c5d0f8; }
+
+  .empty { text-align: center; padding: 28px; color: var(--muted); font-size: 0.82rem; }
+
+  /* 키워드 필터 */
+  .keyword-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .keyword-input-row input {
+    flex: 1;
+    padding: 9px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .keyword-input-row input:focus { border-color: var(--accent); }
+  .keyword-input-row input::placeholder { color: var(--muted); }
+
+  .btn-add-kw {
+    padding: 9px 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 7px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-add-kw:hover { background: #1d48c8; }
+
+  .keyword-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-height: 32px;
+  }
+
+  .kw-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    padding: 5px 10px 5px 12px;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    animation: slideIn 0.15s ease;
+  }
+
+  .kw-tag button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    font-size: 0.8rem;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  .kw-tag button:hover { color: #FF1493; }
+
+  .kw-empty { font-size: 0.8rem; color: var(--muted); padding: 4px 0; }
+
+  .kw-hint {
+    margin-top: 12px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="header-top">
+      <div class="title-group">
+        <h1>매체 합치기 도구</h1>
+        <p>8개 파일을 업로드하면 매체 컬럼을 삽입해 하나로 합칩니다</p>
+      </div>
+      <div class="schema-pill">
+        <span>No</span>
+        <span class="hi">매체 ←삽입</span>
+        <span>분류명</span>
+        <span class="dim">···</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">매체 순서 (파일 업로드 순서와 동일)</div>
+    <div class="media-grid" id="mediaGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">파일 업로드</div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" multiple accept=".xls,.xlsx,.csv">
+      <div class="drop-icon">📂</div>
+      <p><strong>클릭 또는 드래그</strong>해서 파일 추가<br>
+      <span style="font-size:0.76rem">xls · xlsx · csv 지원 &nbsp;·&nbsp; 여러 파일 한 번에 가능</span></p>
+    </div>
+
+    <div class="empty" id="emptyMsg">아직 파일이 없어요 👆</div>
+    <table class="file-table" id="fileTable" style="display:none">
+      <thead>
+        <tr>
+          <th class="f-num">#</th>
+          <th class="f-media">매체</th>
+          <th>파일명</th>
+          <th class="f-rows">데이터행</th>
+          <th class="f-remove"></th>
+        </tr>
+      </thead>
+      <tbody id="fileTbody"></tbody>
+    </table>
+
+    <div class="progress-wrap">
+      <div class="progress-meta">
+        <span>진행</span>
+        <span class="count" id="progressLabel">0 / 8</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="barFill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">키워드 필터 (상품명 포함 검색)</div>
+    <div class="keyword-input-row">
+      <input type="text" id="kwInput" placeholder="키워드 입력 후 추가 (예: 골드바)">
+      <button class="btn-add-kw" onclick="addKeyword()">+ 추가</button>
+    </div>
+    <div class="keyword-tags" id="kwTags">
+      <span class="kw-empty">키워드가 없으면 Y 표시 없이 그냥 합쳐요</span>
+    </div>
+    <div class="kw-hint">💡 상품명에 키워드가 하나라도 포함되면 맨 끝 열에 <strong>Y</strong> 표시됩니다</div>
+  </div>
+
+  <div class="card">
+    <div class="run-area">
+      <button class="btn-run" id="runBtn" disabled onclick="mergeAndDownload()">
+        합치기 &amp; 다운로드
+      </button>
+      <button class="btn-reset" onclick="resetAll()">초기화</button>
+    </div>
+    <div class="status" id="statusMsg"></div>
+  </div>
+
+</div>
+<script>
+const MEDIA_LIST = [
+  '네이버_브랜드검색_PC',
+  '네이버_브랜드검색_MO',
+  '네이버_파워링크_PC',
+  '네이버_파워링크_MO',
+  '네이버_쇼핑검색_PC',
+  '네이버_쇼핑검색_MO',
+  '구글_검색_PC',
+  '구글_검색_MO',
+];
+
+let files = [];
+let keywords = ['골드바','실버바','마미케어','들깨','닌텐도','nintendo','스위치','플스','플레이스테이션','ps5'];
+
+function addKeyword() {
+  const input = document.getElementById('kwInput');
+  const val = input.value.trim();
+  if (!val || keywords.includes(val)) { input.value = ''; return; }
+  keywords.push(val);
+  input.value = '';
+  renderKeywords();
+}
+
+function removeKeyword(idx) {
+  keywords.splice(idx, 1);
+  renderKeywords();
+}
+
+function renderKeywords() {
+  const wrap = document.getElementById('kwTags');
+  wrap.innerHTML = '';
+  if (keywords.length === 0) {
+    wrap.innerHTML = '<span class="kw-empty">키워드가 없으면 Y 표시 없이 그냥 합쳐요</span>';
+    return;
+  }
+  keywords.forEach((kw, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'kw-tag';
+    tag.innerHTML = `${kw}<button onclick="removeKeyword(${i})">✕</button>`;
+    wrap.appendChild(tag);
+  });
+}
+
+// 엔터로도 추가
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('kwInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addKeyword();
+  });
+});
+
+function renderMediaGrid() {
+  const grid = document.getElementById('mediaGrid');
+  grid.innerHTML = '';
+  MEDIA_LIST.forEach((name, i) => {
+    const hasFile = files[i] != null;
+    const tag = document.createElement('div');
+    tag.className = 'media-tag' + (hasFile ? ' has-file' : '');
+    tag.innerHTML = `<span class="num">${String(i+1).padStart(2,'0')}</span><span class="dot"></span><span>${name}</span>`;
+    grid.appendChild(tag);
+  });
+}
+
+function renderFileTable() {
+  const tbody = document.getElementById('fileTbody');
+  const table = document.getElementById('fileTable');
+  const empty = document.getElementById('emptyMsg');
+  tbody.innerHTML = '';
+
+  if (files.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  table.style.display = 'table';
+  empty.style.display = 'none';
+
+  files.forEach((item, i) => {
+    const mediaName = MEDIA_LIST[i];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="f-num">${String(i+1).padStart(2,'0')}</td>
+      <td class="f-media"><span class="media-badge${mediaName ? '' : ' unset'}">${mediaName || '범위 초과'}</span></td>
+      <td class="f-name" title="${item.file.name}">${item.file.name}</td>
+      <td class="f-rows">${item.rowCount != null ? item.rowCount + '행' : '—'}</td>
+      <td class="f-remove"><button class="btn-remove" onclick="removeFile(${i})">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateProgress() {
+  const n = files.length;
+  document.getElementById('barFill').style.width = `${Math.min(n / MEDIA_LIST.length, 1) * 100}%`;
+  document.getElementById('progressLabel').textContent = `${n} / ${MEDIA_LIST.length}`;
+  document.getElementById('runBtn').disabled = n === 0;
+}
+
+async function getRowCount(file) {
+  try {
+    const text = await file.text();
+    if (text.includes('urn:schemas-microsoft-com')) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/xml');
+      const rows = doc.getElementsByTagNameNS('urn:schemas-microsoft-com:office:spreadsheet', 'Row');
+      return Math.max(0, rows.length - 4);
+    }
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    return Math.max(0, data.length - 4);
+  } catch { return null; }
+}
+
+async function addFiles(newFiles) {
+  for (const f of newFiles) {
+    if (!/\.(xls|xlsx|csv)$/i.test(f.name)) continue;
+    const rowCount = await getRowCount(f);
+    files.push({ file: f, rowCount });
+  }
+  renderMediaGrid();
+  renderFileTable();
+  updateProgress();
+}
+
+function removeFile(idx) {
+  files.splice(idx, 1);
+  renderMediaGrid();
+  renderFileTable();
+  updateProgress();
+}
+
+async function parseFile(file) {
+  const text = await file.text();
+
+  if (text.includes('urn:schemas-microsoft-com')) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/xml');
+    const ns = 'urn:schemas-microsoft-com:office:spreadsheet';
+    const rowEls = doc.getElementsByTagNameNS(ns, 'Row');
+    const result = [];
+    for (let r = 0; r < rowEls.length; r++) {
+      const cellEls = rowEls[r].getElementsByTagNameNS(ns, 'Cell');
+      const row = [];
+      for (let c = 0; c < cellEls.length; c++) {
+        const dataEl = cellEls[c].getElementsByTagNameNS(ns, 'Data')[0];
+        if (!dataEl) { row.push(''); continue; }
+        const dtype = dataEl.getAttributeNS(ns, 'Type');
+        const val = dataEl.textContent || '';
+        // Number 타입이면 숫자로 변환 (쉼표 제거 후)
+        if (dtype === 'Number') {
+          const num = parseFloat(val.replace(/,/g, ''));
+          row.push(isNaN(num) ? val : num);
+        } else {
+          row.push(val);
+        }
+      }
+      result.push(row);
+    }
+    return result;
+  }
+
+  const ab = await file.arrayBuffer();
+  const wb = XLSX.read(ab, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+}
+
+async function mergeAndDownload() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = '처리 중...';
+  showStatus('loading', '파일을 읽고 있어요...');
+
+  try {
+    let allRows = [];
+    let headerSet = false;
+    let totalDataRows = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const mediaName = MEDIA_LIST[i] || `매체${i+1}`;
+      const rows = await parseFile(files[i].file);
+      if (rows.length < 3) continue;
+
+      if (!headerSet) {
+        // 행1: 제목행 — B열 빈칸 삽입
+        const row1 = rows[0].slice();
+        row1.splice(1, 0, '');
+        if (keywords.length > 0) row1.push('');
+        allRows.push(row1);
+
+        // 행2: 조건행 — B열 빈칸 삽입
+        const row2 = rows[1].slice();
+        row2.splice(1, 0, '');
+        if (keywords.length > 0) row2.push('');
+        allRows.push(row2);
+
+        // 행3: 헤더 — No 다음에 '매체' 삽입, 끝에 '키워드매칭' 추가
+        const header = rows[2].slice();
+        header.splice(1, 0, '매체');
+        if (keywords.length > 0) header.push('키워드매칭');
+        allRows.push(header);
+
+        headerSet = true;
+      }
+
+      // 행4~끝: 데이터 (합계행 제외)
+      for (let r = 3; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.every(c => c === '' || c == null)) continue;
+        // 합계행 스킵: 첫 셀이 비어있거나 'None'이고 두 번째 셀이 '합계'
+        const firstVal = String(row[0] ?? '').trim();
+        const secondVal = String(row[1] ?? '').trim();
+        if ((firstVal === '' || firstVal === 'None') && secondVal === '합계') continue;
+
+        const newRow = row.slice();
+        newRow.splice(1, 0, mediaName);
+
+        // 키워드 매칭: 상품명은 매체 삽입 후 D열(index 3) — 원본 기준 index 2(상품명)
+        if (keywords.length > 0) {
+          // 매체 삽입 전 원본에서 상품명 찾기 (헤더 기준 3번째 열, index 2)
+          const productName = String(row[2] ?? '');
+          const matched = keywords.some(kw => productName.includes(kw));
+          newRow.push(matched ? 'Y' : '');
+        }
+
+        allRows.push(newRow);
+        totalDataRows++;
+      }
+    }
+
+    if (allRows.length === 0) throw new Error('데이터가 없어요. 파일을 확인해주세요.');
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(allRows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    XLSX.writeFile(wb, `제휴채널매출_합본_${dateStr}.xlsx`);
+
+    showStatus('success', `✅ 완료! 총 ${totalDataRows}행 (${files.length}개 매체) 다운로드됐어요.`);
+
+  } catch (err) {
+    showStatus('error', `❌ 오류: ${err.message}`);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '합치기 & 다운로드';
+}
+
+function showStatus(type, msg) {
+  const el = document.getElementById('statusMsg');
+  el.className = `status ${type}`;
+  el.textContent = msg;
+}
+
+function resetAll() {
+  files = [];
+  keywords = [];
+  renderMediaGrid();
+  renderFileTable();
+  updateProgress();
+  renderKeywords();
+  document.getElementById('statusMsg').className = 'status';
+}
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  addFiles(Array.from(e.target.files));
+  e.target.value = '';
+});
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  addFiles(Array.from(e.dataTransfer.files));
+});
+
+renderMediaGrid();
+updateProgress();
+renderKeywords();
+</script>
+</body>
+</html>
