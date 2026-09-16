@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>신세계쇼핑 SA 일일 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --paper:#EDF0F3; --surface:#FFFFFF; --surface2:#F5F7F9;
+  --ink:#18222D; --muted:#5F6E7D; --line:#D2DAE2;
+  --accent:#1D5B4C; --accent-ink:#FFFFFF; --accent-soft:#E2EFEA;
+  --warn:#A33527; --warn-soft:#FBEAE7;
+  --shadow:0 1px 2px rgba(20,32,44,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#10161D; --surface:#19212B; --surface2:#1F2934;
+    --ink:#E4EBF2; --muted:#94A4B4; --line:#2C3945;
+    --accent:#4FA88D; --accent-ink:#0E1A17; --accent-soft:#1E3A33;
+    --warn:#E38175; --warn-soft:#3A211D;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#10161D; --surface:#19212B; --surface2:#1F2934;
+  --ink:#E4EBF2; --muted:#94A4B4; --line:#2C3945;
+  --accent:#4FA88D; --accent-ink:#0E1A17; --accent-soft:#1E3A33;
+  --warn:#E38175; --warn-soft:#3A211D;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:28px 20px 80px}
+header.top{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px}
+h1{font-size:23px; font-weight:700; letter-spacing:-.02em; margin:0}
+.sub{color:var(--muted); font-size:13.5px}
+.tabs{display:flex; gap:4px; margin:22px 0 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+.tab{
+  appearance:none; border:0; background:none; font:inherit; font-weight:500; cursor:pointer;
+  color:var(--muted); padding:9px 15px; border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+.tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+.dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--line); margin-left:7px; vertical-align:middle}
+.dot.on{background:var(--accent)}
+.dot.off{background:var(--warn)}
+.panel{display:none}
+.panel.on{display:block}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow)}
+.card h2{font-size:15px; font-weight:700; margin:0 0 4px}
+.card p.hint{color:var(--muted); font-size:13px; margin:0 0 14px}
+.drop{
+  border:1.5px dashed var(--line); border-radius:10px; background:var(--surface2);
+  padding:30px 20px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.drop:hover,.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop strong{display:block; font-size:15px; margin-bottom:3px}
+.drop span{color:var(--muted); font-size:13px}
+.filelist{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:7px}
+.filelist li{display:flex; align-items:center; gap:10px; font-size:13.5px; background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:8px 11px}
+.badge{font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--accent-soft); color:var(--accent); white-space:nowrap}
+.badge.bad{background:var(--warn-soft); color:var(--warn)}
+.fname{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted)}
+.rowx{appearance:none;border:0;background:none;color:var(--muted);cursor:pointer;font:inherit;padding:0 4px;line-height:1}
+.rowx:hover{color:var(--warn)}
+.controls{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end}
+label.f{display:flex; flex-direction:column; gap:5px; font-size:13px; color:var(--muted); font-weight:500}
+label.f.wide{flex:1; min-width:280px}
+input[type=date], input[type=text], input[type=number], input[type=url], input[type=password], select{
+  font:inherit; font-size:14px; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:7px; padding:7px 10px; min-width:0; width:100%;
+}
+input:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.btn{
+  appearance:none; font:inherit; font-weight:500; cursor:pointer; border-radius:7px;
+  padding:9px 16px; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.actions{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:9px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+th,td{padding:7px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
+thead th{position:sticky; top:0; background:var(--surface2); font-weight:700; font-size:12.5px; color:var(--muted)}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+tr.newday td{border-top:1px solid var(--line)}
+tr.stale td{color:var(--muted)}
+.scrolly{max-height:460px; overflow:auto}
+.msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-bottom:12px}
+.msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
+.msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
+.msg ul{margin:6px 0 0; padding-left:18px}
+.foot{color:var(--muted); font-size:12.5px; margin-top:10px}
+.total-strip{display:flex; gap:24px; flex-wrap:wrap; font-size:13.5px; margin-top:12px; color:var(--muted)}
+.total-strip b{color:var(--ink); font-variant-numeric:tabular-nums}
+pre.sql{
+  background:var(--surface2); border:1px solid var(--line); border-radius:8px; padding:13px 15px;
+  overflow-x:auto; font-size:12.5px; line-height:1.55; margin:0 0 10px;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+ol.steps{margin:0 0 4px; padding-left:20px; font-size:13.5px; color:var(--muted)}
+ol.steps li{margin-bottom:6px}
+@media (max-width:620px){ .wrap{padding:20px 14px 60px} h1{font-size:20px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>신세계쇼핑 SA 일일 리포트</h1>
+  <span class="sub">네이버 · 구글 · 브랜드검색 리포트 5개를 합쳐 붙여넣기용 엑셀로</span>
+</header>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-panel="p-main">리포트 만들기</button>
+  <button class="tab" role="tab" aria-selected="false" data-panel="p-rate">브검 단가<span class="dot" id="conndot"></span></button>
+  <button class="tab" role="tab" aria-selected="false" data-panel="p-map">캠페인 매핑</button>
+</div>
+
+<!-- ───────── 리포트 만들기 ───────── -->
+<section class="panel on" id="p-main">
+  <div class="card">
+    <h2>리포트 파일 올리기</h2>
+    <p class="hint">네이버 PC · 네이버 MO · 구글 · PC 브검 · MO 브검, 받은 그대로 한 번에 올리면 됩니다. 파일명은 상관없습니다.</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="리포트 파일 올리기">
+      <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
+      <span>CSV 5개 · 인코딩과 형식은 알아서 읽습니다</span>
+    </div>
+    <input type="file" id="fileinput" multiple accept=".csv,.txt" hidden>
+    <ul class="filelist" id="filelist"></ul>
+  </div>
+
+  <div class="card">
+    <h2>기간</h2>
+    <p class="hint">기본은 어제 하루입니다. 당일 데이터는 아직 마감 전이라 항상 빠집니다.</p>
+    <div class="controls">
+      <label class="f">시작일<input type="date" id="dstart"></label>
+      <label class="f">종료일<input type="date" id="dend"></label>
+      <button class="btn" id="resetdate">어제 하루로</button>
+    </div>
+    <div class="foot" id="rangeinfo"></div>
+  </div>
+
+  <div id="report"></div>
+</section>
+
+<!-- ───────── 브검 단가 ───────── -->
+<section class="panel" id="p-rate">
+  <div class="card">
+    <h2>단가 등록</h2>
+    <p class="hint">계약 기간과 총액을 넣으면 일수로 나눠 일 단가를 계산합니다. 일 단가를 직접 아시면 그 칸에 넣으세요. 등록한 줄은 지우지 않고 쌓입니다.</p>
+    <div class="controls">
+      <label class="f wide">광고상품
+        <input type="text" id="f-product" list="products" placeholder="M_브랜드검색_프리미엄형(신)">
+        <datalist id="products">
+          <option value="M_브랜드검색_프리미엄형(신)"></option>
+          <option value="P_브랜드검색_라이트형(신)"></option>
+        </datalist>
+      </label>
+      <label class="f">시작일<input type="date" id="f-from"></label>
+      <label class="f">종료일<input type="date" id="f-to"></label>
+    </div>
+    <div class="controls" style="margin-top:12px">
+      <label class="f">계약 총액 (VAT 제외)<input type="number" id="f-total" placeholder="23643333"></label>
+      <label class="f">일 단가 직접 입력<input type="number" id="f-daily" placeholder="비우면 총액÷일수"></label>
+      <label class="f wide">메모<input type="text" id="f-memo" placeholder="선택"></label>
+    </div>
+    <div class="actions" style="margin-top:16px">
+      <button class="btn primary" id="addrate">등록</button>
+      <span class="foot" id="addnote" style="margin:0"></span>
+    </div>
+    <div id="ratemsg" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>등록된 단가</h2>
+    <p class="hint" id="ratesource"></p>
+    <div class="tablebox scrolly">
+      <table id="ratetable">
+        <thead><tr>
+          <th>광고상품</th><th>시작일</th><th>종료일</th>
+          <th class="num">계약 총액</th><th class="num">일 단가</th><th>메모</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="foot">기간이 겹치면 나중에 등록한 줄이 우선합니다. 지난 기간 줄을 남겨두면 과거 날짜를 다시 뽑아도 그때 단가로 계산됩니다.</div>
+  </div>
+</section>
+
+<!-- ───────── 캠페인 매핑 ───────── -->
+<section class="panel" id="p-map">
+  <div class="card">
+    <h2>캠페인 분류</h2>
+    <p class="hint">바뀌지 않는 값이라 페이지에 고정해 두었습니다. 새 캠페인이 생기면 알려주세요.</p>
+    <div class="tablebox scrolly">
+      <table id="maptable">
+        <thead><tr><th>리포트의 캠페인 / 기기</th><th>묶을 이름</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2>정렬 순서</h2>
+    <p class="hint">엑셀에 찍히는 행 순서입니다.</p>
+    <div class="foot" id="orderlist" style="margin:0"></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+
+/* ── 접속 정보 ─────────────────────────
+   키를 바꿔야 할 때는 이 두 줄만 고치면 됩니다. */
+const SUPABASE_URL = "https://qvmnbdimdokxbpzjxiyp.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2bW5iZGltZG9reGJwemp4aXlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MjU5MjMsImV4cCI6MjEwNTEwMTkyM30.YZ1qDEQ9adO1iJxb-906mLNEIrH-0VR8YEu-4-fSZdY";
+
+/* ── 고정값: 캠페인 분류와 정렬 순서 ───────────────────────── */
+const MAP_ROWS = [
+  ["N_SA_PC_브랜드","N_SA_PC"],["N_SA_PC_카테고리_식품","N_SA_PC"],["N_SA_PC_카테고리_패션","N_SA_PC"],
+  ["N_SA_PC_카테고리_기타","N_SA_PC"],["N_SA_PC_작업예정","N_SA_PC"],["N_SA_PC_백화점","N_SA_PC_백화점"],
+  ["N_SA_MO_브랜드","N_SA_MO"],["N_SA_MO_카테고리_식품","N_SA_MO"],["N_SA_MO_카테고리_패션","N_SA_MO"],
+  ["N_SA_MO_카테고리_기타","N_SA_MO"],["N_SA_MO_작업예정","N_SA_MO"],["N_SA_MO_백화점","N_SA_MO_백화점"],
+  ["N_SA_MO_슈퍼브랜드","N_SA_MO_슈퍼브랜드"],["N_SS_PC","N_SS_PC"],["N_SS_PC_SB","N_SS_PC_SB"],
+  ["N_SS_PC_백화점","N_SS_PC_백화점"],["N_SS_MO","N_SS_MO"],["N_SS_MO_SB","N_SS_MO_SB"],
+  ["N_SS_MO_백화점","N_SS_MO_백화점"],["N_SS_MO_슈퍼브랜드","N_SS_MO_슈퍼브랜드"],
+  ["컴퓨터","G_검색PC"],["휴대전화","G_검색MO"],["태블릿","G_검색MO"]
+];
+const MAP = {}; MAP_ROWS.forEach(([a,b])=>{ MAP[a]=b; });
+const ORDER = [
+  "G_검색MO","G_검색PC","N_SA_MO","N_SA_MO_백화점","N_SA_PC","N_SA_PC_백화점",
+  "N_SS_MO","N_SS_MO_SB","N_SS_MO_백화점","N_SS_PC","N_SS_PC_SB","N_SS_PC_백화점",
+  "N_SA_MO_슈퍼브랜드","N_SS_MO_슈퍼브랜드","P_브랜드검색_라이트형(신)","M_브랜드검색_프리미엄형(신)"
+];
+
+/* ── 저장 ───────────────────────── */
+const store = {
+  get(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+let RATES = store.get("sscom.rates.cache", []);   // 오프라인 대비 캐시
+let ONLINE = false;
+
+/* ── 유틸 ───────────────────────── */
+const pad = n => String(n).padStart(2,"0");
+const iso = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const today = () => iso(new Date());
+function yesterday(){ const d=new Date(); d.setDate(d.getDate()-1); return iso(d); }
+function normDate(s){
+  s = String(s==null?"":s).trim().replace(/"/g,"");
+  let m = s.match(/(\d{4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})/);
+  return m ? `${m[1]}-${pad(m[2])}-${pad(m[3])}` : "";
+}
+function daysBetween(a,b){
+  const [y1,m1,d1]=a.split("-").map(Number), [y2,m2,d2]=b.split("-").map(Number);
+  return Math.floor((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/86400000)+1;
+}
+const num = v => { const n = parseFloat(String(v==null?"":v).replace(/["',\s₩원]/g,"")); return isFinite(n)?n:0; };
+const fmt = n => Math.round(n).toLocaleString("ko-KR");
+const esc = s => String(s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function decode(buf){
+  const b = new Uint8Array(buf);
+  if(b[0]===0xFF && b[1]===0xFE) return new TextDecoder("utf-16le").decode(buf);
+  if(b[0]===0xFE && b[1]===0xFF) return new TextDecoder("utf-16be").decode(buf);
+  try{ return new TextDecoder("utf-8",{fatal:true}).decode(buf).replace(/^\uFEFF/,""); }
+  catch(e){ return new TextDecoder("euc-kr").decode(buf); }
+}
+function splitLine(line, delim){
+  const out=[]; let cur="", q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c === '"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
+    else if(c===delim && !q){ out.push(cur); cur=""; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+function msg(kind, title, items){
+  const d = document.createElement("div"); d.className = "msg " + kind;
+  d.innerHTML = esc(title) + (items && items.length ? "<ul>" + items.slice(0,12).map(i=>`<li>${esc(i)}</li>`).join("") +
+    (items.length>12 ? `<li>외 ${items.length-12}건</li>` : "") + "</ul>" : "");
+  return d;
+}
+function say(boxId, kind, title, items){
+  const box = document.getElementById(boxId);
+  box.innerHTML = ""; box.appendChild(msg(kind, title, items));
+}
+
+/* ── Supabase ───────────────────────── */
+function configured(){ return !!(SUPABASE_URL && SUPABASE_KEY && !/^PASTE_/.test(SUPABASE_KEY)); }
+async function sb(path, opts){
+  opts = opts || {};
+  const base = SUPABASE_URL.replace(/\/+$/,"").replace(/\/rest\/v1$/,"");
+  const auth = {apikey: SUPABASE_KEY};
+  // 새 형식(sb_publishable_...)은 JWT가 아니라서 Authorization 헤더에 넣으면 거부됩니다.
+  if(!/^sb_/.test(SUPABASE_KEY)) auth.Authorization = "Bearer " + SUPABASE_KEY;
+  const res = await fetch(base + "/rest/v1/" + path, Object.assign({}, opts, {
+    headers: Object.assign({"Content-Type":"application/json"}, auth, opts.headers || {})
+  }));
+  if(!res.ok){
+    let detail = "";
+    try{ const j = await res.json(); detail = j.message || j.hint || JSON.stringify(j); }
+    catch(e){ detail = await res.text().catch(()=> ""); }
+    throw new Error(`${res.status} ${detail}`.trim());
+  }
+  if(res.status === 204) return null;
+  return res.json();
+}
+function fromDb(r){
+  return {
+    id: r.id, product: r.product,
+    from: r.start_date || "", to: r.end_date || "",
+    total: r.total_amount == null ? 0 : Number(r.total_amount),
+    daily: r.daily_rate == null ? null : Number(r.daily_rate),
+    memo: r.memo || "", at: r.created_at || ""
+  };
+}
+async function pullRates(){
+  if(!configured()){ ONLINE = false; renderRates(); return; }
+  try{
+    const rows = await sb("bs_rates?select=*&order=id.asc");
+    RATES = rows.map(fromDb);
+    ONLINE = true;
+    store.set("sscom.rates.cache", RATES);
+    store.set("sscom.pulledAt", new Date().toISOString());
+  }catch(e){
+    ONLINE = false;
+    say("ratemsg", "warn", "Supabase에서 단가를 읽지 못했습니다. 마지막으로 받아둔 값으로 계산합니다.", [String(e.message||e)]);
+  }
+  renderRates(); build();
+}
+
+/* ── 단가 조회 ───────────────────────── */
+function dailyRate(r){
+  if(r.daily != null && r.daily !== 0) return r.daily;
+  if(r.from && r.to){
+    const d = daysBetween(r.from, r.to);
+    if(d > 0 && r.total) return r.total / d;
+  }
+  return null;
+}
+function rateFor(product, date){
+  let hit = null;
+  RATES.forEach(r=>{
+    if(!r.product || String(r.product).trim() !== product) return;
+    if(!r.from || !r.to || date < r.from || date > r.to) return;
+    const v = dailyRate(r);
+    if(v != null) hit = v;      // 뒤에 등록된 줄이 우선
+  });
+  return hit;
+}
+
+/* ── 리포트 파싱 ───────────────────────── */
+const FILES = [];
+const KIND_LABEL = {naver:"네이버", google:"구글", bs:"브검", unknown:"확인필요"};
+function classify(text){
+  const head = text.slice(0, 4000);
+  if(/광고상품/.test(head) && /집행금액/.test(head)) return "bs";
+  if(/통화\s*코드/.test(head) || /\t기기\t/.test(head)) return "google";
+  if(/일별/.test(head) && /캠페인유형/.test(head)) return "naver";
+  return "unknown";
+}
+function parseNaver(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim()!=="");
+  const hi = lines.findIndex(l => /일별/.test(l) && /캠페인유형/.test(l));
+  if(hi<0) return [];
+  const H = splitLine(lines[hi], ",");
+  const ix = n => H.findIndex(h => h.replace(/"/g,"") === n);
+  const c = {d:ix("일별"), camp:ix("캠페인"), imp:ix("노출수"), clk:ix("클릭수"), cost:ix("총비용")};
+  const rows=[];
+  for(let i=hi+1;i<lines.length;i++){
+    const f = splitLine(lines[i], ",");
+    const d = normDate(f[c.d]);
+    if(!d) continue;
+    rows.push({date:d, raw:(f[c.camp]||"").replace(/"/g,"").trim(),
+               imp:num(f[c.imp]), clk:num(f[c.clk]), cost:num(f[c.cost])/1.1, src:"네이버"});
+  }
+  return rows;
+}
+function parseGoogle(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim()!=="");
+  const hi = lines.findIndex(l => /노출수/.test(l) && /클릭수/.test(l));
+  if(hi<0) return [];
+  const delim = lines[hi].includes("\t") ? "\t" : ",";
+  const H = splitLine(lines[hi], delim);
+  const find = (...names) => H.findIndex(h => names.some(n => h.replace(/"/g,"") === n));
+  const c = {d:find("일","날짜"), dev:find("기기","디바이스"), imp:find("노출수"), clk:find("클릭수"), cost:find("비용","총비용")};
+  const rows=[];
+  for(let i=hi+1;i<lines.length;i++){
+    const f = splitLine(lines[i], delim);
+    const d = normDate(f[c.d]);
+    if(!d) continue;
+    rows.push({date:d, raw:(f[c.dev]||"").replace(/"/g,"").trim(),
+               imp:num(f[c.imp]), clk:num(f[c.clk]), cost:num(f[c.cost])*1.1, src:"구글"});
+  }
+  return rows;
+}
+function parseBs(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim()!=="");
+  const hi = lines.findIndex(l => /광고상품/.test(l) && /집행금액/.test(l));
+  if(hi<0) return [];
+  const H = splitLine(lines[hi], ",").map(h=>h.replace(/"/g,""));
+  const ix = n => H.indexOf(n);
+  const c = {p:ix("광고상품"), d:ix("일자"), imp:ix("노출수"), clk:ix("클릭수")};
+  const rows=[];
+  for(let i=hi+1;i<lines.length;i++){
+    const f = splitLine(lines[i], ",").map(s=>s.replace(/"/g,"").trim());
+    const d = normDate(f[c.d]);
+    if(!d) continue;
+    rows.push({date:d, raw:f[c.p], imp:num(f[c.imp]), clk:num(f[c.clk]), cost:null, src:"브검"});
+  }
+  return rows;
+}
+
+/* ── 업로드 UI ───────────────────────── */
+const drop = document.getElementById("drop");
+const fileinput = document.getElementById("fileinput");
+drop.addEventListener("click", ()=>fileinput.click());
+drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fileinput.click(); }});
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove("over");}));
+drop.addEventListener("drop", e=>handleFiles(e.dataTransfer.files));
+fileinput.addEventListener("change", e=>{ handleFiles(e.target.files); fileinput.value=""; });
+
+async function handleFiles(list){
+  for(const f of list){
+    const text = decode(await f.arrayBuffer());
+    const kind = classify(text);
+    let rows = [];
+    if(kind==="naver") rows = parseNaver(text);
+    else if(kind==="google") rows = parseGoogle(text);
+    else if(kind==="bs") rows = parseBs(text);
+    FILES.push({name:f.name, kind, rows});
+  }
+  renderFiles(); autoRange(); build();
+}
+function renderFiles(){
+  const ul = document.getElementById("filelist");
+  ul.innerHTML = "";
+  FILES.forEach((f,i)=>{
+    const li = document.createElement("li");
+    const b = document.createElement("span");
+    b.className = "badge" + (f.kind==="unknown"||!f.rows.length ? " bad" : "");
+    b.textContent = KIND_LABEL[f.kind] + (f.rows.length ? ` ${f.rows.length}행` : " 0행");
+    const n = document.createElement("span"); n.className="fname"; n.textContent=f.name;
+    const x = document.createElement("button"); x.className="rowx"; x.type="button";
+    x.setAttribute("aria-label","이 파일 빼기"); x.textContent="✕";
+    x.onclick = ()=>{ FILES.splice(i,1); renderFiles(); build(); };
+    li.append(b,n,x); ul.appendChild(li);
+  });
+}
+
+/* ── 기간 ───────────────────────── */
+const dstart = document.getElementById("dstart"), dend = document.getElementById("dend");
+dstart.value = yesterday(); dend.value = yesterday();
+[dstart,dend].forEach(el=>el.addEventListener("change", build));
+document.getElementById("resetdate").onclick = ()=>{ dstart.value=yesterday(); dend.value=yesterday(); build(); };
+function autoRange(){
+  const all = FILES.flatMap(f=>f.rows.map(r=>r.date)).filter(Boolean).sort();
+  document.getElementById("rangeinfo").textContent =
+    all.length ? `올린 파일의 데이터 기간: ${all[0]} ~ ${all[all.length-1]}` : "";
+}
+
+/* ── 집계 ───────────────────────── */
+function build(){
+  const box = document.getElementById("report");
+  const rows = FILES.flatMap(f=>f.rows);
+  if(!rows.length){ box.innerHTML=""; return; }
+
+  const s = dstart.value, e0 = dend.value, cap = today();
+  const e = (e0 && e0 >= cap) ? (function(){ const d=new Date(cap); d.setDate(d.getDate()-1); return iso(d); })() : e0;
+
+  const warnUnmapped = new Set(), warnRate = new Set();
+  const agg = new Map();
+
+  rows.forEach(r=>{
+    if(!r.date || r.date >= cap) return;
+    if(s && r.date < s) return;
+    if(e && r.date > e) return;
+    let key, cost;
+    if(r.src === "브검"){
+      key = r.raw;
+      const rate = rateFor(r.raw, r.date);
+      if(rate === null){ warnRate.add(`${r.date} · ${r.raw}`); cost = 0; }
+      else cost = rate;
+    } else {
+      key = MAP[r.raw];
+      if(!key){ warnUnmapped.add(`${r.src} · ${r.raw}`); key = r.raw; }
+      cost = r.cost;
+    }
+    const id = r.date + "|" + key;
+    const cur = agg.get(id) || {date:r.date, key, imp:0, clk:0, cost:0};
+    cur.imp += r.imp; cur.clk += r.clk; cur.cost += cost;
+    agg.set(id, cur);
+  });
+
+  const out = [...agg.values()].sort((a,b)=>{
+    if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+    const ia = ORDER.indexOf(a.key), ib = ORDER.indexOf(b.key);
+    return (ia<0?9999:ia) - (ib<0?9999:ib) || (a.key<b.key?-1:1);
+  });
+
+  box.innerHTML = "";
+  const card = document.createElement("div"); card.className="card";
+  if(warnRate.size)
+    card.appendChild(msg("warn","브검 단가가 없는 날짜가 있습니다. ‘브검 단가’ 탭에서 해당 기간을 등록해 주세요.",[...warnRate]));
+  if(warnUnmapped.size)
+    card.appendChild(msg("warn","분류표에 없는 캠페인입니다. 지금은 원래 이름 그대로 맨 뒤에 나옵니다.",[...warnUnmapped]));
+  if(!out.length){
+    card.appendChild(msg("warn","고른 기간에 데이터가 없습니다. 기간을 넓혀보세요.",[]));
+    box.appendChild(card); return;
+  }
+
+  const h2 = document.createElement("h2"); h2.textContent = "붙여넣을 표";
+  const hint = document.createElement("p"); hint.className="hint"; hint.textContent = `${out.length}행 · ${s} ~ ${e}`;
+  card.append(h2, hint);
+
+  const tb = document.createElement("div"); tb.className="tablebox scrolly";
+  const t = document.createElement("table");
+  t.innerHTML = "<thead><tr><th>날짜</th><th>캠페인</th><th>광고그룹</th>" +
+                "<th class='num'>노출수</th><th class='num'>클릭수</th><th class='num'>총비용(vat-)</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  let prev = null;
+  out.forEach(r=>{
+    const tr = document.createElement("tr");
+    if(prev && prev !== r.date) tr.className = "newday";
+    prev = r.date;
+    tr.innerHTML = `<td>${r.date}</td><td>${esc(r.key)}</td><td></td>` +
+      `<td class="num">${fmt(r.imp)}</td><td class="num">${fmt(r.clk)}</td><td class="num">${fmt(r.cost)}</td>`;
+    tbody.appendChild(tr);
+  });
+  t.appendChild(tbody); tb.appendChild(t); card.appendChild(tb);
+
+  const tot = out.reduce((a,r)=>({i:a.i+r.imp, c:a.c+r.clk, m:a.m+r.cost}), {i:0,c:0,m:0});
+  const strip = document.createElement("div"); strip.className="total-strip";
+  strip.innerHTML = `합계 노출수 <b>${fmt(tot.i)}</b> · 클릭수 <b>${fmt(tot.c)}</b> · 총비용(vat-) <b>${fmt(tot.m)}</b>`;
+  card.appendChild(strip);
+
+  const act = document.createElement("div"); act.className="actions"; act.style.marginTop="16px";
+  const dl = document.createElement("button"); dl.className="btn primary"; dl.textContent="엑셀 내려받기";
+  dl.onclick = ()=>download(out, s, e);
+  const cp = document.createElement("button"); cp.className="btn"; cp.textContent="표 복사";
+  cp.onclick = ()=>copy(out, cp);
+  act.append(dl, cp); card.appendChild(act);
+  box.appendChild(card);
+}
+
+/* ── 내보내기 ───────────────────────── */
+function download(out, s, e){
+  const aoa = [["날짜","캠페인","광고그룹","노출수","클릭수","총비용(vat-)"]];
+  out.forEach(r=>aoa.push([r.date, r.key, "", r.imp, r.clk, r.cost]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [{wch:12},{wch:30},{wch:22},{wch:12},{wch:10},{wch:14}];
+  for(let i=2;i<=aoa.length;i++) ["D","E","F"].forEach(c=>{ if(ws[c+i]) ws[c+i].z = "#,##0"; });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "통합");
+  const tag = (s===e) ? s.replace(/-/g,"") : s.replace(/-/g,"")+"-"+e.replace(/-/g,"");
+  XLSX.writeFile(wb, `신세계쇼핑_SA_통합_${tag}.xlsx`);
+}
+async function copy(out, btn){
+  const tsv = [["날짜","캠페인","광고그룹","노출수","클릭수","총비용(vat-)"].join("\t")]
+    .concat(out.map(r=>[r.date, r.key, "", Math.round(r.imp), Math.round(r.clk), Math.round(r.cost)].join("\t")))
+    .join("\n");
+  try{ await navigator.clipboard.writeText(tsv); btn.textContent="복사함"; }
+  catch(e){ btn.textContent="복사 실패"; }
+  setTimeout(()=>btn.textContent="표 복사", 1600);
+}
+
+/* ── 단가 등록 / 목록 ───────────────────────── */
+document.getElementById("addrate").onclick = async ()=>{
+  const product = document.getElementById("f-product").value.trim();
+  const from = document.getElementById("f-from").value;
+  const to = document.getElementById("f-to").value;
+  const total = num(document.getElementById("f-total").value);
+  const dailyRaw = document.getElementById("f-daily").value.trim();
+  const daily = dailyRaw === "" ? null : num(dailyRaw);
+  const memo = document.getElementById("f-memo").value.trim();
+
+  const bad = [];
+  if(!product) bad.push("광고상품을 넣어주세요");
+  if(!from || !to) bad.push("시작일과 종료일을 넣어주세요");
+  if(from && to && from > to) bad.push("종료일이 시작일보다 빠릅니다");
+  if(!total && daily === null) bad.push("계약 총액이나 일 단가 중 하나는 있어야 합니다");
+  if(bad.length){ say("ratemsg","warn","등록하지 못했습니다.", bad); return; }
+  if(!configured()){ say("ratemsg","warn","저장소 연결 정보가 설정되지 않았습니다. 관리자에게 알려주세요.",[]); return; }
+
+  const note = document.getElementById("addnote");
+  note.textContent = "등록 중…";
+  try{
+    await sb("bs_rates", {
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body: JSON.stringify({
+        product, start_date:from, end_date:to,
+        total_amount: total || null, daily_rate: daily, memo: memo || null
+      })
+    });
+    note.textContent = "등록했습니다";
+    document.getElementById("ratemsg").innerHTML = "";
+    ["f-product","f-from","f-to","f-total","f-daily","f-memo"].forEach(id=>{ document.getElementById(id).value=""; });
+    await pullRates();
+  }catch(e){
+    note.textContent = "";
+    say("ratemsg","warn","Supabase에 등록하지 못했습니다.",[String(e.message||e)]);
+  }
+  setTimeout(()=>{ note.textContent=""; }, 2400);
+};
+
+function renderRates(){
+  const tbody = document.querySelector("#ratetable tbody");
+  tbody.innerHTML = "";
+  const dot = document.getElementById("conndot");
+  dot.className = "dot " + (configured() ? (ONLINE ? "on" : "off") : "");
+
+  const at = store.get("sscom.pulledAt","");
+  const src = document.getElementById("ratesource");
+  if(!configured()) src.textContent = "저장소 연결 정보가 설정되지 않았습니다.";
+  else if(ONLINE){
+    const d = new Date(at);
+    src.textContent = `${RATES.length}줄 누적 · 마지막 조회 ${isNaN(d)?"":`${pad(d.getHours())}:${pad(d.getMinutes())}`}`;
+  }
+  else src.textContent = "저장소에 연결하지 못해 마지막으로 받아둔 값을 보여줍니다.";
+
+  if(!RATES.length){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6" style="color:var(--muted)">등록된 단가가 없습니다.</td>`;
+    tbody.appendChild(tr); return;
+  }
+  const now = today();
+  RATES.forEach(r=>{
+    const v = dailyRate(r);
+    const tr = document.createElement("tr");
+    if(r.to && r.to < now) tr.className = "stale";
+    tr.innerHTML =
+      `<td>${esc(r.product)}</td><td>${esc(r.from||"—")}</td><td>${esc(r.to||"—")}</td>` +
+      `<td class="num">${r.total ? fmt(r.total) : "—"}</td>` +
+      `<td class="num"${v==null?' style="color:var(--warn)"':""}>${v==null?"확인필요":fmt(v)}</td>` +
+      `<td>${esc(r.memo||"")}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ── 매핑 / 정렬 보기 ───────────────────────── */
+(function(){
+  const tbody = document.querySelector("#maptable tbody");
+  MAP_ROWS.forEach(([a,b])=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${esc(a)}</td><td>${esc(b)}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById("orderlist").textContent = ORDER.join("  ›  ");
+})();
+
+/* ── 탭 전환 ───────────────────────── */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.onclick = ()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", String(x===t)));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("on", p.id===t.dataset.panel));
+  };
+});
+
+renderRates();
+if(configured()) pullRates();
+</script>
+</body>
+</html>
