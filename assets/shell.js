@@ -18,7 +18,7 @@ var NAV = [
   { path:"",            label:"홈",            icon:"⌂", home:false },
 
   { group:"광고 운영" },
-  { path:"merge/",      label:"매체 합치기",    icon:"⊞",
+  { path:"merger/",     label:"매체 합치기",    icon:"⊞",
     desc:"매체별 리포트 파일을 하나로 합치고 매체 열을 붙입니다." },
   { path:"sa-report/",  label:"SA 일일 리포트", icon:"▤",
     desc:"네이버·구글·브랜드검색 리포트를 합쳐 붙여넣기용 엑셀로 만듭니다." }
