@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>매체 합치기</title>
+<title>SPO 도구</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' ry='7' fill='black'/><text x='16' y='23' font-family='Arial Black,sans-serif' font-size='20' font-weight='900' fill='%23FF1493' text-anchor='middle'>S</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="../assets/shell.css">
@@ -422,7 +422,7 @@
   <div class="header">
     <div class="header-top">
       <div class="title-group">
-        <h1>매체 합치기</h1>
+        <h1>SPO 도구</h1>
       </div>
     </div>
   </div>
@@ -550,6 +550,7 @@
         <div class="cc-count" id="ccCount3">0개</div>
       </div>
     </div>
+    <div class="kw-hint">💡 백화점 두 칸 사이에는 같은 코드가 있어도 됩니다. 슈퍼브랜드와 겹칠 때만 멈춥니다.</div>
     <div id="ccMsg"></div>
   </div>
 
@@ -969,10 +970,9 @@ renderKeywords();
 
     var p1 = parseCodes(t1.value), p2 = parseCodes(t2.value), p3 = parseCodes(t3.value);
 
-    /* 칸끼리 겹치면 멈춥니다 */
+    /* 슈퍼브랜드와 백화점이 겹치면 멈춥니다 (백화점 두 칸끼리는 겹쳐도 됩니다) */
     var clash = [];
-    var pairs = [[p1,p2,"백화점(쇼검)","백화점(쇼검 외)"],
-                 [p1,p3,"백화점(쇼검)","슈퍼브랜드"],
+    var pairs = [[p1,p3,"백화점(쇼검)","슈퍼브랜드"],
                  [p2,p3,"백화점(쇼검 외)","슈퍼브랜드"]];
     pairs.forEach(function(pr){
       pr[0].list.forEach(function(c){
