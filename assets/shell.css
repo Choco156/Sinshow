@@ -1,34 +1,31 @@
 /* ─────────────────────────────────────────────
    Sinshow 공용 레이아웃
-   모든 페이지가 이 파일과 shell.js 를 불러 씁니다.
+   색·글꼴 기준은 SA 일일 리포트 페이지를 따릅니다.
    ───────────────────────────────────────────── */
 
 :root{
-  --paper:#FFF7F5; --surface:#FFFFFF; --surface2:#FDF0EE;
-  --ink:#2B1520; --muted:#8A6B74; --line:#F2DCE0;
-  --accent:#C81E4E; --accent-ink:#FFFFFF; --accent-soft:#FDE6EC;
-  --mark:#2D3A8C;
-  --warn:#9A5B00; --warn-soft:#FBEFD9;
-  --shadow:0 1px 2px rgba(80,20,40,.07);
+  --paper:#EDF0F3; --surface:#FFFFFF; --surface2:#F5F7F9;
+  --ink:#18222D; --muted:#5F6E7D; --line:#D2DAE2;
+  --accent:#1D5B4C; --accent-ink:#FFFFFF; --accent-soft:#E2EFEA;
+  --warn:#A33527; --warn-soft:#FBEAE7;
+  --shadow:0 1px 2px rgba(20,32,44,.08);
   --rail:238px;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --paper:#1A1016; --surface:#241820; --surface2:#2E2029;
-    --ink:#F2E7EA; --muted:#B79AA3; --line:#3D2A33;
-    --accent:#FF6B8F; --accent-ink:#2A0B16; --accent-soft:#40202C;
-    --mark:#93A3F0;
-    --warn:#E0A44A; --warn-soft:#3A2A14;
-    --shadow:0 1px 2px rgba(0,0,0,.45);
+    --paper:#10161D; --surface:#19212B; --surface2:#1F2934;
+    --ink:#E4EBF2; --muted:#94A4B4; --line:#2C3945;
+    --accent:#4FA88D; --accent-ink:#0E1A17; --accent-soft:#1E3A33;
+    --warn:#E38175; --warn-soft:#3A211D;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
   }
 }
 :root[data-theme="dark"]{
-  --paper:#1A1016; --surface:#241820; --surface2:#2E2029;
-  --ink:#F2E7EA; --muted:#B79AA3; --line:#3D2A33;
-  --accent:#FF6B8F; --accent-ink:#2A0B16; --accent-soft:#40202C;
-  --mark:#93A3F0;
-  --warn:#E0A44A; --warn-soft:#3A2A14;
-  --shadow:0 1px 2px rgba(0,0,0,.45);
+  --paper:#10161D; --surface:#19212B; --surface2:#1F2934;
+  --ink:#E4EBF2; --muted:#94A4B4; --line:#2C3945;
+  --accent:#4FA88D; --accent-ink:#0E1A17; --accent-soft:#1E3A33;
+  --warn:#E38175; --warn-soft:#3A211D;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
 }
 
 *{box-sizing:border-box}
@@ -46,37 +43,31 @@ body{
   display:flex; flex-direction:column; overflow-y:auto;
 }
 .shell-brand{
-  display:flex; align-items:center; gap:11px;
-  padding:22px 20px 18px; text-decoration:none; color:inherit;
+  display:flex; align-items:center; gap:10px;
+  padding:20px 20px 16px; text-decoration:none; color:inherit;
+  border-bottom:1px solid var(--line);
 }
 .shell-mark{
-  width:30px; height:30px; border-radius:9px; flex:none;
+  width:28px; height:28px; border-radius:7px; flex:none;
   background:var(--accent); color:var(--accent-ink);
-  display:grid; place-items:center; font-size:15px;
-  font-family:"Gothic A1","Noto Sans KR",sans-serif; font-weight:900;
+  display:grid; place-items:center; font-weight:700; font-size:13px;
 }
-.shell-brand b{
-  display:block; font-size:16px; letter-spacing:-.02em;
-  font-family:"Gothic A1","Noto Sans KR",sans-serif; font-weight:900;
-}
+.shell-brand b{display:block; font-size:15px; font-weight:700; letter-spacing:-.01em}
 .shell-brand small{display:block; font-size:11.5px; color:var(--muted); line-height:1.3; font-weight:400}
 
-.shell-nav{padding:6px 10px 12px; flex:1}
-.shell-group{
-  font-size:12px; font-weight:700; color:var(--muted);
-  padding:16px 10px 6px;
-}
+.shell-nav{padding:12px 10px; flex:1}
+.shell-group{font-size:12px; font-weight:700; color:var(--muted); padding:14px 10px 6px}
 .shell-link{
   display:flex; align-items:center; gap:10px;
-  padding:9px 10px; margin-bottom:2px; border-radius:8px;
+  padding:8px 10px; margin-bottom:2px; border-radius:7px;
   color:var(--ink); text-decoration:none; font-size:14px; font-weight:500;
 }
 .shell-link:hover{background:var(--surface2)}
 .shell-link[aria-current="page"]{background:var(--accent-soft); color:var(--accent); font-weight:700}
 .shell-link:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
-.shell-link .ico{width:18px; text-align:center; font-size:13px; opacity:.7; flex:none}
+.shell-link .ico{width:18px; text-align:center; font-size:13px; opacity:.75; flex:none}
 .shell-link.soon{color:var(--muted); cursor:default; pointer-events:none}
-.shell-link.soon::after{content:"준비중"; margin-left:auto; font-size:10.5px; opacity:.75}
+.shell-link.soon::after{content:"준비중"; margin-left:auto; font-size:10.5px; opacity:.7}
 
 .shell-foot{padding:14px 20px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted)}
 
@@ -87,11 +78,11 @@ body{
 /* ── 모바일 ── */
 .shell-toggle{
   display:none; position:fixed; top:12px; left:12px; z-index:60;
-  width:40px; height:40px; border-radius:10px; cursor:pointer;
+  width:40px; height:40px; border-radius:9px; cursor:pointer;
   background:var(--surface); border:1px solid var(--line); color:var(--ink);
   font-size:17px; line-height:1; box-shadow:var(--shadow);
 }
-.shell-veil{display:none; position:fixed; inset:0; z-index:35; background:rgba(40,10,20,.45)}
+.shell-veil{display:none; position:fixed; inset:0; z-index:35; background:rgba(10,16,22,.45)}
 @media (max-width:860px){
   .shell-toggle{display:block}
   .shell-rail{transform:translateX(-100%); transition:transform .18s ease}
@@ -103,39 +94,30 @@ body{
 @media (prefers-reduced-motion:reduce){ *{transition:none !important} }
 
 /* ── 홈 ── */
-.home-date{font-size:13.5px; color:var(--accent); font-weight:700; margin:12px 0 6px}
-.home-title{
-  font-family:"Gothic A1","Noto Sans KR",sans-serif; font-weight:900;
-  font-size:clamp(34px, 6vw, 52px); line-height:1.08; letter-spacing:-.035em;
-  margin:0 0 10px;
-}
-.home-sub{color:var(--muted); font-size:14.5px; margin:0 0 34px; max-width:46ch}
+.home-head{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:24px}
+.home-head h1{font-size:23px; font-weight:700; letter-spacing:-.02em; margin:0}
+.home-head .sub{color:var(--muted); font-size:13.5px}
 
 .tool{
-  display:flex; align-items:stretch; gap:0;
-  background:var(--surface); border:1px solid var(--line);
-  border-radius:14px; overflow:hidden; text-decoration:none; color:inherit;
-  margin-bottom:12px;
+  display:flex; align-items:center; gap:16px;
+  background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  padding:18px 20px; margin-bottom:12px; box-shadow:var(--shadow);
+  text-decoration:none; color:inherit;
 }
 .tool:hover{border-color:var(--accent)}
-.tool:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
-.tool-bar{width:7px; flex:none; background:var(--accent)}
-.tool-bar.alt{background:var(--mark)}
-.tool-body{padding:24px 26px; flex:1; min-width:0}
-.tool-body h2{
-  font-family:"Gothic A1","Noto Sans KR",sans-serif; font-weight:900;
-  font-size:21px; letter-spacing:-.02em; margin:0 0 4px;
+.tool:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.tool .ico{
+  width:36px; height:36px; border-radius:8px; flex:none;
+  background:var(--accent-soft); color:var(--accent);
+  display:grid; place-items:center; font-size:15px;
 }
-.tool-body p{margin:0; color:var(--muted); font-size:14px; max-width:60ch}
-.tool-go{
-  display:grid; place-items:center; width:58px; flex:none;
-  color:var(--muted); font-size:20px; border-left:1px solid var(--line);
-}
-.tool:hover .tool-go{color:var(--accent); background:var(--accent-soft)}
+.tool-body{flex:1; min-width:0}
+.tool-body h2{font-size:15px; font-weight:700; margin:0 0 2px}
+.tool-body p{margin:0; color:var(--muted); font-size:13px}
+.tool-go{color:var(--muted); font-size:17px; flex:none}
+.tool:hover .tool-go{color:var(--accent)}
 
-.tool.soon{
-  background:none; border-style:dashed; pointer-events:none;
-}
-.tool.soon .tool-bar{background:var(--line)}
+.tool.soon{background:none; border-style:dashed; box-shadow:none; pointer-events:none}
+.tool.soon .ico{background:var(--surface2); color:var(--muted)}
 .tool.soon .tool-body h2{color:var(--muted)}
-.tool.soon .tool-go{border-left-color:transparent; font-size:11.5px; font-weight:700}
+.tool.soon .tool-go{font-size:11.5px; font-weight:700}
