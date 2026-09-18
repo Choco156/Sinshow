@@ -937,7 +937,7 @@ renderKeywords();
       try{
         var wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
         var ws = wb.Sheets[wb.SheetNames[0]];
-        SHEET = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false });
+        SHEET = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
         var head = findHeader(SHEET);
         if(!head){
           SHEET = null;
