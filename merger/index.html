@@ -563,6 +563,17 @@
 
   <div id="ccResult"></div>
 
+  <div class="card">
+    <div class="card-title">SPO → RAW 인덱스</div>
+    <div class="tablebox">
+      <table class="cc-table" id="ccIndex">
+        <thead><tr><th>SPO</th><th>RAW</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="kw-hint">💡 RAW 열은 이 표에서 찾아 채웁니다. 값이 바뀌면 알려주세요.</div>
+  </div>
+
   </section>
 
 </div>
@@ -871,6 +882,24 @@ renderKeywords();
     };
   });
 
+  /* SPO → RAW 인덱스. 값이 바뀌면 이 표만 고치면 됩니다. */
+  var RAWMAP = {
+    "구글_검색_MO-":             "1011013 [키워드] 구글 파워링크 MOB",
+    "구글_검색_PC-":             "1011014 [키워드] 구글 파워링크 PC",
+    "네이버_파워링크_MO-":        "1011008 [키워드] 네이버 파워링크 MOB",
+    "네이버_파워링크_PC-":        "1011012 [키워드] 네이버 파워링크 PC",
+    "네이버_브랜드검색_MO-":      "1011000 [키워드] 네이버 브랜드검색 MOB",
+    "네이버_브랜드검색_PC-":      "1011007 [키워드] 네이버 브랜드검색 PC",
+    "네이버_쇼핑검색_MO-":        "1011003 [키워드] 네이버 쇼핑검색 MOB",
+    "네이버_쇼핑검색_PC-":        "1011010 [키워드] 네이버 쇼핑검색 PC",
+    "네이버_쇼핑검색_PC백화점":     "1011010 [키워드] 네이버 쇼핑검색 PC_백화점",
+    "네이버_쇼핑검색_MO백화점":     "1011003 [키워드] 네이버 쇼핑검색 MOB_백화점",
+    "네이버_파워링크_PC백화점":     "1011012 [키워드] 네이버 파워링크 PC_백화점",
+    "네이버_파워링크_MO백화점":     "1011008 [키워드] 네이버 파워링크 MOB_백화점",
+    "네이버_파워링크_MO슈퍼브랜드":  "1011008 [키워드] 네이버 파워링크 MOB_슈퍼브랜드",
+    "네이버_쇼핑검색_MO슈퍼브랜드":  "1011003 [키워드] 네이버 쇼핑검색 MOB_슈퍼브랜드"
+  };
+
   var el = function(id){ return document.getElementById(id); };
   var fileEl = el("ccFile"), infoEl = el("ccFileInfo");
   var t1 = el("ccDeptShop"), t2 = el("ccDeptEtc"), t3 = el("ccSuper");
@@ -993,30 +1022,26 @@ renderKeywords();
     }
 
     /* 분류 */
-    var out = [], tally = {}, used = {}, counts = {"백화점":0, "슈퍼브랜드":0, "-":0};
+    var out = [], tally = {}, counts = {"백화점":0, "슈퍼브랜드":0, "-":0}, noRaw = [];
     SHEET.forEach(function(row, i){
       var r = (row || []).slice();
       if(i < head.row){ out.push(r); return; }            // 제목·기간 줄은 그대로
       if(i === head.row){
-        r.splice(ci + 1, 0, "구분", "상품코드구분");
+        r.splice(ci + 1, 0, "구분", "SPO", "RAW");
         out.push(r); return;
       }
       var code = String(r[ci] == null ? "" : r[ci]).trim();
       if(!code){ out.push(r); return; }
       var media = String(r[mi] == null ? "" : r[mi]).trim();
       var mark = decide(media, code, p1.set, p2.set, p3.set);
-      if(mark !== "-") used[code] = true;
+      var spo = media + mark;
+      var raw = RAWMAP[spo];
+      if(raw === undefined){ raw = "#N/A"; if(noRaw.indexOf(spo) < 0) noRaw.push(spo); }
       counts[mark]++;
       tally[media] = tally[media] || {"백화점":0, "슈퍼브랜드":0, "-":0};
       tally[media][mark]++;
-      r.splice(ci + 1, 0, mark, code + mark);
+      r.splice(ci + 1, 0, mark, spo, raw);
       out.push(r);
-    });
-
-    /* 파일에서 한 번도 안 걸린 코드 */
-    var unused = [];
-    [p1, p2, p3].forEach(function(p){
-      p.list.forEach(function(c){ if(!used[c] && unused.indexOf(c) < 0) unused.push(c); });
     });
 
     /* 화면 결과 */
@@ -1052,8 +1077,8 @@ renderKeywords();
     card.appendChild(box);
     resultBox.appendChild(card);
 
-    if(unused.length){
-      show(resultBox, "warn", "붙여넣은 코드 중 이 파일에서 한 번도 분류되지 않은 것이 있습니다. 오타이거나 해당 매체에 판매가 없는 경우입니다.", unused);
+    if(noRaw.length){
+      show(resultBox, "warn", "인덱스에 없는 조합이 있어 RAW 열에 #N/A 로 남겨두었습니다.", noRaw);
     }
 
     /* 엑셀 저장 */
@@ -1062,6 +1087,17 @@ renderKeywords();
     XLSX.utils.book_append_sheet(wb, ws, "분류");
     XLSX.writeFile(wb, FILENAME + "_분류.xlsx");
   };
+
+  /* 인덱스 표 보여주기 */
+  (function(){
+    var tb = document.querySelector("#ccIndex tbody");
+    Object.keys(RAWMAP).forEach(function(k){
+      var tr = document.createElement("tr");
+      var a = document.createElement("td"); a.textContent = k;
+      var b = document.createElement("td"); b.textContent = RAWMAP[k];
+      tr.appendChild(a); tr.appendChild(b); tb.appendChild(tr);
+    });
+  })();
 
   el("ccReset").onclick = function(){
     SHEET = null; FILENAME = "";
