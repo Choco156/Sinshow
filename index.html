@@ -6,16 +6,17 @@
 <title>Sinshow · 광고 운영 도구</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/shell.css">
 <script src="assets/shell.js" defer></script>
 </head>
 <body>
 
 <div class="wrap">
-  <p class="home-date" id="date"></p>
-  <h1 class="home-title">오늘 할 일<br>여기서 시작하세요</h1>
-  <p class="home-sub">매일 반복되는 리포트 작업을 모아둔 곳입니다. 쓸 도구를 고르면 바로 열립니다.</p>
+  <header class="home-head">
+    <h1>광고 운영 도구</h1>
+    <span class="sub" id="date"></span>
+  </header>
 
   <div id="tools"></div>
 </div>
@@ -28,7 +29,6 @@ document.addEventListener("shell:ready", function(){
     (d.getMonth()+1) + "월 " + d.getDate() + "일 " + days[d.getDay()] + "요일";
 
   var box = document.getElementById("tools");
-  var alt = false;
 
   window.SINSHOW.nav.forEach(function(item){
     if(item.group || item.home === false) return;
@@ -37,24 +37,26 @@ document.addEventListener("shell:ready", function(){
     el.className = "tool" + (item.soon ? " soon" : "");
     if(!item.soon) el.href = window.SINSHOW.base + item.path;
 
-    var bar = document.createElement("span");
-    bar.className = "tool-bar" + (alt ? " alt" : "");
-    alt = !alt;
+    var ico = document.createElement("span");
+    ico.className = "ico";
+    ico.textContent = item.icon || "·";
 
     var body = document.createElement("div");
     body.className = "tool-body";
     var h = document.createElement("h2");
     h.textContent = item.label;
-    var p = document.createElement("p");
-    p.textContent = item.desc || "";
     body.appendChild(h);
-    if(item.desc) body.appendChild(p);
+    if(item.desc){
+      var p = document.createElement("p");
+      p.textContent = item.desc;
+      body.appendChild(p);
+    }
 
     var go = document.createElement("span");
     go.className = "tool-go";
     go.textContent = item.soon ? "준비중" : "›";
 
-    el.appendChild(bar); el.appendChild(body); el.appendChild(go);
+    el.appendChild(ico); el.appendChild(body); el.appendChild(go);
     box.appendChild(el);
   });
 });
