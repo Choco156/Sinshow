@@ -7,41 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/shell.css">
+<script src="../assets/config.js"></script>
+<script src="../assets/shell.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{
-  --paper:#EDF0F3; --surface:#FFFFFF; --surface2:#F5F7F9;
-  --ink:#18222D; --muted:#5F6E7D; --line:#D2DAE2;
-  --accent:#1D5B4C; --accent-ink:#FFFFFF; --accent-soft:#E2EFEA;
-  --warn:#A33527; --warn-soft:#FBEAE7;
-  --shadow:0 1px 2px rgba(20,32,44,.08);
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --paper:#10161D; --surface:#19212B; --surface2:#1F2934;
-    --ink:#E4EBF2; --muted:#94A4B4; --line:#2C3945;
-    --accent:#4FA88D; --accent-ink:#0E1A17; --accent-soft:#1E3A33;
-    --warn:#E38175; --warn-soft:#3A211D;
-    --shadow:0 1px 2px rgba(0,0,0,.4);
-  }
-}
-:root[data-theme="dark"]{
-  --paper:#10161D; --surface:#19212B; --surface2:#1F2934;
-  --ink:#E4EBF2; --muted:#94A4B4; --line:#2C3945;
-  --accent:#4FA88D; --accent-ink:#0E1A17; --accent-soft:#1E3A33;
-  --warn:#E38175; --warn-soft:#3A211D;
-  --shadow:0 1px 2px rgba(0,0,0,.4);
-}
-*{box-sizing:border-box}
-body{
-  margin:0; background:var(--paper); color:var(--ink);
-  font-family:"Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
-}
-.wrap{max-width:1080px; margin:0 auto; padding:28px 20px 80px}
-header.top{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px}
-h1{font-size:23px; font-weight:700; letter-spacing:-.02em; margin:0}
-.sub{color:var(--muted); font-size:13.5px}
 .tabs{display:flex; gap:4px; margin:22px 0 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
 .tab{
   appearance:none; border:0; background:none; font:inherit; font-weight:500; cursor:pointer;
@@ -112,7 +82,7 @@ pre.sql{
 }
 ol.steps{margin:0 0 4px; padding-left:20px; font-size:13.5px; color:var(--muted)}
 ol.steps li{margin-bottom:6px}
-@media (max-width:620px){ .wrap{padding:20px 14px 60px} h1{font-size:20px} }
+@media (max-width:620px){ h1{font-size:20px} }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 </head>
@@ -224,11 +194,6 @@ ol.steps li{margin-bottom:6px}
 
 <script>
 "use strict";
-
-/* ── 접속 정보 ─────────────────────────
-   키를 바꿔야 할 때는 이 두 줄만 고치면 됩니다. */
-const SUPABASE_URL = "https://qvmnbdimdokxbpzjxiyp.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2bW5iZGltZG9reGJwemp4aXlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MjU5MjMsImV4cCI6MjEwNTEwMTkyM30.YZ1qDEQ9adO1iJxb-906mLNEIrH-0VR8YEu-4-fSZdY";
 
 /* ── 고정값: 캠페인 분류와 정렬 순서 ───────────────────────── */
 const MAP_ROWS = [
