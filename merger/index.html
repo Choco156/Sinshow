@@ -395,6 +395,13 @@
   }
   .cc-field textarea:focus{border-color:var(--accent)}
   .cc-count{font-size:12px; color:var(--muted); margin-top:5px}
+  .cc-split{display:none; align-items:center; gap:7px; font-size:13px; margin:0 0 8px; cursor:pointer; user-select:none}
+  .cc-split.on{display:flex}
+  .cc-split input{width:15px; height:15px; accent-color:var(--accent); margin:0}
+  .cc-days{display:none; flex-direction:column; gap:10px}
+  .cc-days.on{display:flex}
+  .cc-day b{display:block; font-size:12.5px; margin-bottom:4px}
+  .cc-day textarea{min-height:90px}
   .cc-msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-top:14px}
   .cc-msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
   .cc-msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
@@ -546,8 +553,12 @@
       <div class="cc-field">
         <label>슈퍼브랜드
           <span class="sub">쇼핑검색 MO · 파워링크 MO 에만 분류 (PC 제외)</span></label>
-        <textarea id="ccSuper" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
-        <div class="cc-count" id="ccCount3">0개</div>
+        <label class="cc-split" id="ccSplitWrap"><input type="checkbox" id="ccSplit"> 날짜별로 따로 입력</label>
+        <div id="ccSuperOne">
+          <textarea id="ccSuper" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+          <div class="cc-count" id="ccCount3">0개</div>
+        </div>
+        <div class="cc-days" id="ccDays"></div>
       </div>
     </div>
     <div class="kw-hint">💡 백화점 두 칸 사이에는 같은 코드가 있어도 됩니다. 슈퍼브랜드와 겹칠 때만 멈춥니다.</div>
@@ -905,7 +916,7 @@ renderKeywords();
   var t1 = el("ccDeptShop"), t2 = el("ccDeptEtc"), t3 = el("ccSuper");
   var runBtn = el("ccRun"), msgBox = el("ccMsg"), resultBox = el("ccResult");
 
-  var SHEET = null, FILENAME = "";
+  var SHEET = null, FILENAME = "", DATES = [];
 
   /* 붙여넣은 글에서 숫자 코드만 뽑아냅니다 (줄바꿈·쉼표·공백 아무거나) */
   function parseCodes(text){
@@ -927,6 +938,34 @@ renderKeywords();
   }
   [t1,t2,t3].forEach(function(t){ t.addEventListener("input", refreshCounts); });
 
+  /* 슈퍼브랜드 날짜별 입력 */
+  var splitWrap = el("ccSplitWrap"), splitCk = el("ccSplit");
+  var oneBox = el("ccSuperOne"), daysBox = el("ccDays");
+
+  function setSplit(on){
+    oneBox.style.display = on ? "none" : "";
+    daysBox.classList.toggle("on", on);
+    if(!on){ daysBox.innerHTML = ""; return; }
+    daysBox.innerHTML = "";
+    DATES.forEach(function(d){
+      var w = document.createElement("div");
+      w.className = "cc-day";
+      var b = document.createElement("b");
+      b.textContent = d;
+      var ta = document.createElement("textarea");
+      ta.dataset.date = d;
+      ta.value = t3.value;                    // 하나로 넣어둔 코드를 미리 복사
+      var cnt = document.createElement("div");
+      cnt.className = "cc-count";
+      var upd = function(){ cnt.textContent = parseCodes(ta.value).list.length + "개"; };
+      ta.addEventListener("input", upd);
+      upd();
+      w.appendChild(b); w.appendChild(ta); w.appendChild(cnt);
+      daysBox.appendChild(w);
+    });
+  }
+  splitCk.addEventListener("change", function(){ setSplit(splitCk.checked); });
+
   /* 파일 읽기 */
   fileEl.addEventListener("change", function(e){
     var f = e.target.files[0];
@@ -945,7 +984,20 @@ renderKeywords();
           runBtn.disabled = true;
           return;
         }
-        infoEl.textContent = f.name + " · 데이터 " + (SHEET.length - head.row - 1) + "행";
+        DATES = [];
+        if(head.date >= 0){
+          var seen = {};
+          for(var i = head.row + 1; i < SHEET.length; i++){
+            var d = String((SHEET[i] || [])[head.date] || "").trim();
+            if(d && !seen[d]){ seen[d] = true; DATES.push(d); }
+          }
+          DATES.sort();
+        }
+        infoEl.textContent = f.name + " · 데이터 " + (SHEET.length - head.row - 1) + "행" +
+          (DATES.length > 1 ? " · " + DATES[0] + " ~ " + DATES[DATES.length - 1] + " (" + DATES.length + "일)" : "");
+        splitCk.checked = false;
+        setSplit(false);
+        splitWrap.classList.toggle("on", DATES.length > 1);
         runBtn.disabled = false;
       }catch(err){
         SHEET = null; runBtn.disabled = true;
@@ -959,13 +1011,14 @@ renderKeywords();
   function findHeader(rows){
     for(var i = 0; i < Math.min(rows.length, 20); i++){
       var r = rows[i] || [];
-      var code = -1, media = -1;
+      var code = -1, media = -1, date = -1;
       for(var c = 0; c < r.length; c++){
         var v = String(r[c] || "").trim();
         if(v === "상품코드") code = c;
         if(v === "매체") media = c;
+        if(v === "일자별") date = c;
       }
-      if(code >= 0) return { row: i, code: code, media: media };
+      if(code >= 0) return { row: i, code: code, media: media, date: date };
     }
     return null;
   }
@@ -999,13 +1052,26 @@ renderKeywords();
 
     var p1 = parseCodes(t1.value), p2 = parseCodes(t2.value), p3 = parseCodes(t3.value);
 
+    /* 슈퍼브랜드: 날짜별로 나눴으면 날짜마다, 아니면 하나로 전체 적용 */
+    var split = splitCk.checked && DATES.length > 1;
+    var superByDate = {}, superGroups = [];
+    if(split){
+      daysBox.querySelectorAll("textarea").forEach(function(ta){
+        var p = parseCodes(ta.value);
+        superByDate[ta.dataset.date] = p;
+        superGroups.push({ label: "슈퍼브랜드 " + ta.dataset.date, p: p });
+      });
+    } else {
+      superGroups.push({ label: "슈퍼브랜드", p: p3 });
+    }
+
     /* 슈퍼브랜드와 백화점이 겹치면 멈춥니다 (백화점 두 칸끼리는 겹쳐도 됩니다) */
     var clash = [];
-    var pairs = [[p1,p3,"백화점(쇼검)","슈퍼브랜드"],
-                 [p2,p3,"백화점(쇼검 외)","슈퍼브랜드"]];
-    pairs.forEach(function(pr){
-      pr[0].list.forEach(function(c){
-        if(pr[1].set[c]) clash.push(c + " — " + pr[2] + " / " + pr[3]);
+    superGroups.forEach(function(g){
+      [[p1,"백화점(쇼검)"],[p2,"백화점(쇼검 외)"]].forEach(function(d){
+        d[0].list.forEach(function(c){
+          if(g.p.set[c]) clash.push(c + " — " + d[1] + " / " + g.label);
+        });
       });
     });
     if(clash.length){
@@ -1014,8 +1080,16 @@ renderKeywords();
       return;
     }
 
+    if(split){
+      var empty = DATES.filter(function(d){ return !superByDate[d] || !superByDate[d].list.length; });
+      if(empty.length){
+        var ok = confirm(empty.join(", ") + " 슈퍼브랜드 칸이 비어 있습니다.\n확인을 누르면 해당 날짜는 슈퍼브랜드 없이 진행합니다.");
+        if(!ok) return;
+      }
+    }
+
     var head = findHeader(SHEET);
-    var ci = head.code, mi = head.media;
+    var ci = head.code, mi = head.media, di = head.date;
     if(mi < 0){
       show(msgBox, "warn", "‘매체’ 열을 찾지 못했습니다. 합본 파일이 맞는지 확인해 주세요.", []);
       return;
@@ -1033,7 +1107,12 @@ renderKeywords();
       var code = String(r[ci] == null ? "" : r[ci]).trim();
       if(!code){ out.push(r); return; }
       var media = String(r[mi] == null ? "" : r[mi]).trim();
-      var mark = decide(media, code, p1.set, p2.set, p3.set);
+      var superSet = p3.set;
+      if(split){
+        var rd = String(r[di] == null ? "" : r[di]).trim();
+        superSet = superByDate[rd] ? superByDate[rd].set : {};
+      }
+      var mark = decide(media, code, p1.set, p2.set, superSet);
       var spo = media + mark;
       var raw = RAWMAP[spo];
       if(raw === undefined){ raw = "#N/A"; if(noRaw.indexOf(spo) < 0) noRaw.push(spo); }
@@ -1103,6 +1182,7 @@ renderKeywords();
     SHEET = null; FILENAME = "";
     fileEl.value = ""; t1.value = ""; t2.value = ""; t3.value = "";
     infoEl.textContent = "아직 파일이 없어요 👆";
+    DATES = []; splitCk.checked = false; setSplit(false); splitWrap.classList.remove("on");
     msgBox.innerHTML = ""; resultBox.innerHTML = "";
     runBtn.disabled = true;
     refreshCounts();
