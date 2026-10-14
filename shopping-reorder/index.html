@@ -58,7 +58,7 @@
 
 <div class="card">
   <h2>소재 파일 올리기</h2>
-  <p class="hint">첫 시트(쇼검_소재)만 사용합니다. 디바이스 · 소재 ID · 기본상품명 · 노출상품명 · 카테고리 · 쇼핑몰 상품ID · 카테고리(C열) 순서로 7개 열만 남기고, 수식은 모두 값으로 바꿉니다.</p>
+  <p class="hint">첫 시트(쇼검_소재)만 사용합니다. 디바이스 · 소재 ID · 기본상품명 · 노출상품명 · 카테고리 · 쇼핑몰 상품ID · 카테고리(C열) 순서로 7개 열만 남기고, 수식은 모두 값으로 바꿉니다. 노출상품명이 비어 있으면 기본상품명으로 채웁니다.</p>
   <div class="drop" id="drop" tabindex="0" role="button" aria-label="소재 파일 올리기">
     <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
     <span>xlsx 1개 · 용량이 크면 읽는 데 수십 초 걸릴 수 있습니다</span>
@@ -153,6 +153,13 @@
       var order = ORDER;
       var body = hdr >= 0 ? rows.slice(hdr) : rows;
       var out = body.map(function(row){ return order.map(function(c){ return row[c] === undefined ? null : row[c]; }); });
+      // 노출상품명(4번째 열)이 비어 있으면 기본상품명(3번째 열)으로 채움
+      var filled = 0;
+      for(var j = (hdr >= 0 ? 1 : 0); j < out.length; j++){
+        if(out[j][3] == null || String(out[j][3]).trim() === ""){
+          if(out[j][2] != null && String(out[j][2]).trim() !== ""){ out[j][3] = out[j][2]; filled++; }
+        }
+      }
 
       var nws = XLSX.utils.aoa_to_sheet(out);
       if(ws["!cols"]) nws["!cols"] = order.map(function(c){ return ws["!cols"][c] || {}; });
@@ -164,7 +171,7 @@
       var n = hdr >= 0 ? rows.length - hdr - 1 : rows.length;
       list.querySelector(".badge").textContent = "완료";
       list.querySelector(".rows").textContent = n.toLocaleString("ko-KR") + "행";
-      var html = esc(outName) + " 파일로 저장했습니다.";
+      var html = esc(outName) + " 파일로 저장했습니다." + (filled ? " 비어 있던 노출상품명 " + filled.toLocaleString("ko-KR") + "개는 기본상품명으로 채웠습니다." : "");
       if(warn.length){
         show("warn", html + " 다만 헤더가 예상과 달라 확인이 필요합니다.<ul><li>" + warn.join("</li><li>") + "</li></ul>");
       }else show("ok", html);
