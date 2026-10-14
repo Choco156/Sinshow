@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회원가입 리포트 가공</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/shell.css">
+<script src="../assets/shell.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+.tabs{display:flex; gap:4px; margin:0 0 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+.tab{
+  appearance:none; border:0; background:none; font:inherit; font-weight:500; cursor:pointer;
+  color:var(--muted); padding:9px 15px; border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+.tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+.panel{display:none}
+.panel.on{display:block}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow)}
+.card h2{font-size:15px; font-weight:700; margin:0 0 4px}
+.card p.hint{color:var(--muted); font-size:13px; margin:0 0 14px}
+.drop{
+  border:1.5px dashed var(--line); border-radius:10px; background:var(--surface2);
+  padding:26px 20px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.drop:hover,.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.drop strong{display:block; font-size:15px; margin-bottom:3px}
+.drop span{color:var(--muted); font-size:13px}
+.filelist{list-style:none; margin:12px 0 0; padding:0; display:grid; gap:7px}
+.filelist li{display:flex; align-items:center; gap:10px; font-size:13.5px; background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:8px 11px}
+.badge{font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--accent-soft); color:var(--accent); white-space:nowrap}
+.badge.wait{background:var(--surface); color:var(--muted); border:1px solid var(--line)}
+.badge.bad{background:var(--warn-soft); color:var(--warn)}
+.fname{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted)}
+.rows{font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:14px}
+.field label{display:block; font-size:13px; font-weight:700; margin-bottom:6px}
+.field .sub{display:block; font-weight:400; color:var(--muted); font-size:12px; margin-top:2px}
+.field textarea{
+  width:100%; min-height:150px; resize:vertical;
+  font-family:inherit; font-size:13px; line-height:1.5; color:var(--ink);
+  background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:10px 12px;
+  outline:none; font-variant-numeric:tabular-nums;
+}
+.field textarea:focus{border-color:var(--accent)}
+.count{font-size:12px; color:var(--muted); margin-top:5px}
+.btn{
+  appearance:none; font:inherit; font-weight:500; cursor:pointer; border-radius:7px;
+  padding:9px 16px; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.actions{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-top:14px}
+.msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
+.msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
+.msg.load{background:var(--surface2); color:var(--muted); border:1px solid var(--line)}
+.msg ul{margin:6px 0 0; padding-left:18px}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:9px; background:var(--surface); margin-top:14px}
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+th,td{padding:7px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
+th{background:var(--surface2); font-weight:700; font-size:12.5px; color:var(--muted)}
+td.n,th.n{text-align:right; font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+tr.sum td{font-weight:700; border-top:1px solid var(--line)}
+@media (max-width:620px){ .home-head h1{font-size:20px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="home-head">
+  <h1>회원가입 리포트 가공</h1>
+  <span class="sub">SA·SS 일별 회원가입 CSV에 구분과 몰 상품id를 붙입니다</span>
+</header>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-panel="p-sa">SA 구분</button>
+  <button class="tab" role="tab" aria-selected="false" data-panel="p-ss">SS 몰 상품id · 구분</button>
+</div>
+
+<!-- ───────── 1. SA 구분 ───────── -->
+<section class="panel on" id="p-sa">
+  <div class="card">
+    <h2>SA 일별 회원가입 파일</h2>
+    <p class="hint">C열(Content) 뒤에 "구분" 열을 넣습니다. SUPERBRAND가 들어 있으면 슈퍼브랜드, SB가 밑줄로 나뉜 단어로 있으면(SB, SB_xxx) 백화점, 둘 다 아니면 "-"입니다. 대소문자는 구분하지 않고, SUPERBRAND를 먼저 봅니다.</p>
+    <div class="drop" id="saDrop" tabindex="0" role="button" aria-label="SA 파일 올리기">
+      <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
+      <span>CSV 1개</span>
+    </div>
+    <input type="file" id="saInput" accept=".csv,.txt" hidden>
+    <ul class="filelist" id="saList"></ul>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="btn primary" id="saRun" disabled>구분 &amp; 다운로드</button>
+      <button class="btn" id="saReset">초기화</button>
+    </div>
+    <div id="saMsg"></div>
+  </div>
+</section>
+
+<!-- ───────── 2. SS 몰 상품id · 구분 ───────── -->
+<section class="panel" id="p-ss">
+  <div class="card">
+    <h2>파일 올리기</h2>
+    <p class="hint">SS 일별 회원가입 CSV와 네이버 쇼핑검색 소재 엑셀을 함께 올리세요. 엑셀은 두 번째 시트(쇼검_소재상세)에서 H열 소재 ID로 S열 몰상품 ID를 찾아 C열 뒤 "몰 상품id"에 넣고, 없으면 #N/A로 적습니다.</p>
+    <div class="drop" id="ssDrop" tabindex="0" role="button" aria-label="SS 파일 올리기">
+      <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
+      <span>CSV 1개 + xlsx 1개 · 한 번에 올려도 됩니다 · 엑셀은 읽는 데 수십 초 걸릴 수 있습니다</span>
+    </div>
+    <input type="file" id="ssInput" accept=".csv,.txt,.xlsx,.xls" multiple hidden>
+    <ul class="filelist" id="ssList"></ul>
+  </div>
+
+  <div class="card">
+    <h2>상품코드 붙여넣기</h2>
+    <p class="hint">몰 상품id 뒤 "구분" 열에 씁니다. 캠페인이 ss_mo이고 슈퍼브랜드 코드에 있으면 슈퍼브랜드(백화점과 겹쳐도 우선), 그 밖에 백화점 코드에 있으면 백화점, 나머지와 #N/A는 "-"입니다. 슈퍼브랜드는 MO에만 적용되므로 ss_pc는 겹쳐도 백화점으로 갑니다.</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="ssDept">백화점<span class="sub">MO · PC 모두 적용</span></label>
+        <textarea id="ssDept" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+        <div class="count" id="ssDeptCount">0개</div>
+      </div>
+      <div class="field">
+        <label for="ssSuper">슈퍼브랜드<span class="sub">ss_mo 캠페인에만 적용</span></label>
+        <textarea id="ssSuper" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+        <div class="count" id="ssSuperCount">0개</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="btn primary" id="ssRun" disabled>매칭 · 구분 &amp; 다운로드</button>
+      <button class="btn" id="ssReset">초기화</button>
+    </div>
+    <div id="ssMsg"></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ── 공통 ───────────────────────── */
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function tick(){ return new Promise(function(r){ setTimeout(r, 30); }); }
+  function fmtN(n){ return n.toLocaleString("ko-KR"); }
+
+  function say(boxId, kind, title, items){
+    var box = $(boxId);
+    if(!kind){ box.innerHTML = ""; return; }
+    var html = '<div class="msg ' + kind + '">' + title;
+    if(items && items.length) html += "<ul><li>" + items.join("</li><li>") + "</li></ul>";
+    box.innerHTML = html + "</div>";
+  }
+
+  // 탭
+  document.querySelectorAll(".tab").forEach(function(t){
+    t.addEventListener("click", function(){
+      document.querySelectorAll(".tab").forEach(function(x){ x.setAttribute("aria-selected", x === t ? "true" : "false"); });
+      document.querySelectorAll(".panel").forEach(function(p){ p.classList.toggle("on", p.id === t.dataset.panel); });
+    });
+  });
+
+  function bindDrop(dropId, inputId, onFiles){
+    var drop = $(dropId), input = $(inputId);
+    drop.addEventListener("click", function(){ input.click(); });
+    drop.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); } });
+    ["dragenter","dragover"].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+    ["dragleave","drop"].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+    drop.addEventListener("drop", function(e){ onFiles(Array.from(e.dataTransfer.files)); });
+    input.addEventListener("change", function(){ onFiles(Array.from(input.files)); input.value = ""; });
+  }
+
+  // CSV 읽기 (UTF-8 우선, 안 되면 EUC-KR)
+  async function readText(file){
+    var buf = await file.arrayBuffer();
+    try{ return new TextDecoder("utf-8", {fatal:true}).decode(buf).replace(/^\uFEFF/, ""); }
+    catch(e){ return new TextDecoder("euc-kr").decode(buf).replace(/^\uFEFF/, ""); }
+  }
+  function parseCSV(text){
+    var rows = [], row = [], f = "", q = false, i = 0, c;
+    for(; i < text.length; i++){
+      c = text[i];
+      if(q){
+        if(c === '"'){ if(text[i+1] === '"'){ f += '"'; i++; } else q = false; }
+        else f += c;
+      }else if(c === '"') q = true;
+      else if(c === ","){ row.push(f); f = ""; }
+      else if(c === "\n" || c === "\r"){
+        if(c === "\r" && text[i+1] === "\n") i++;
+        row.push(f); rows.push(row); row = []; f = "";
+      }else f += c;
+    }
+    if(f !== "" || row.length){ row.push(f); rows.push(row); }
+    return rows;
+  }
+  // 원본과 같은 형식: 모든 칸 따옴표, CRLF, BOM
+  function toCSV(rows){
+    return "\uFEFF" + rows.map(function(r){
+      return r.map(function(v){ return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }).join(",");
+    }).join("\r\n") + "\r\n";
+  }
+  function download(text, name){
+    var url = URL.createObjectURL(new Blob([text], {type:"text/csv;charset=utf-8"}));
+    var a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+  function outName(name){ return name.replace(/\.(csv|txt)$/i, "") + "_수정.csv"; }
+  function insertAfterC(row, vals){ var r = row.slice(); while(r.length < 3) r.push(""); r.splice.apply(r, [3, 0].concat(vals)); return r; }
+  function isCsv(f){ return /\.(csv|txt)$/i.test(f.name); }
+  function isXlsx(f){ return /\.(xlsx|xls)$/i.test(f.name); }
+  function fileLi(badgeCls, badge, name, right){
+    return '<li><span class="badge ' + badgeCls + '">' + esc(badge) + '</span><span class="fname">' + esc(name) + '</span><span class="rows">' + esc(right || "") + "</span></li>";
+  }
+  function tallyTable(head, rowsData){
+    var h = "<div class='tablebox'><table><thead><tr>" + head.map(function(x, i){ return "<th" + (i ? " class='n'" : "") + ">" + esc(x) + "</th>"; }).join("") + "</tr></thead><tbody>";
+    rowsData.forEach(function(r){
+      h += "<tr" + (r.sum ? " class='sum'" : "") + ">" + r.cells.map(function(x, i){ return "<td" + (i ? " class='n'" : "") + ">" + esc(i ? fmtN(x) : x) + "</td>"; }).join("") + "</tr>";
+    });
+    return h + "</tbody></table></div>";
+  }
+
+  /* ── 1. SA 구분 ───────────────────────── */
+  function saClass(content){
+    var u = String(content || "").toUpperCase();
+    if(u.indexOf("SUPERBRAND") >= 0) return "슈퍼브랜드";
+    if(u.split(/[_\s-]+/).indexOf("SB") >= 0) return "백화점";
+    return "-";
+  }
+
+  var saFile = null;
+  bindDrop("saDrop", "saInput", function(files){
+    say("saMsg");
+    var f = files.filter(isCsv)[0];
+    if(!f){ say("saMsg", "warn", "CSV 파일만 올릴 수 있습니다."); return; }
+    saFile = f;
+    $("saList").innerHTML = fileLi("wait", "대기", f.name, "");
+    $("saRun").disabled = false;
+  });
+  $("saReset").onclick = function(){ saFile = null; $("saList").innerHTML = ""; $("saRun").disabled = true; say("saMsg"); };
+
+  $("saRun").onclick = async function(){
+    if(!saFile) return;
+    try{
+      var rows = parseCSV(await readText(saFile));
+      if(rows.length < 2) throw new Error("데이터 행이 없습니다.");
+      var warn = [];
+      if(String(rows[0][2]).trim().toLowerCase() !== "content") warn.push('C열 헤더가 "' + esc(rows[0][2]) + '"입니다 (예상: Content).');
+      var counts = {"백화점":0, "슈퍼브랜드":0, "-":0};
+      var out = rows.map(function(r, i){
+        if(i === 0) return insertAfterC(r, ["구분"]);
+        var g = saClass(r[2]); counts[g]++;
+        return insertAfterC(r, [g]);
+      });
+      var name = outName(saFile.name);
+      download(toCSV(out), name);
+      $("saList").innerHTML = fileLi("", "완료", saFile.name, fmtN(rows.length - 1) + "행");
+      say("saMsg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다.", warn);
+      $("saMsg").insertAdjacentHTML("beforeend", tallyTable(["구분", "행 수"], [
+        {cells:["백화점", counts["백화점"]]}, {cells:["슈퍼브랜드", counts["슈퍼브랜드"]]}, {cells:["-", counts["-"]]},
+        {sum:true, cells:["합계", rows.length - 1]}
+      ]));
+    }catch(e){
+      console.error(e);
+      say("saMsg", "warn", "처리하지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }
+  };
+
+  /* ── 2. SS 몰 상품id · 구분 ───────────────────────── */
+  var ss = { csv:null, xlsx:null, map:null, loading:false, xlsxRows:0 };
+
+  function renderSsList(){
+    var h = "";
+    if(ss.csv) h += fileLi("", "회원가입", ss.csv.name, "");
+    if(ss.xlsx){
+      if(ss.loading) h += fileLi("wait", "읽는 중", ss.xlsx.name, "");
+      else if(ss.map) h += fileLi("", "소재상세", ss.xlsx.name, "소재 ID " + fmtN(ss.map.size) + "개");
+      else h += fileLi("bad", "실패", ss.xlsx.name, "");
+    }
+    $("ssList").innerHTML = h;
+    $("ssRun").disabled = !(ss.csv && ss.map && !ss.loading);
+  }
+
+  function normCode(v){
+    return String(v == null ? "" : v).trim().replace(/^'/, "").replace(/\.0+$/, "");
+  }
+  function codeSet(text){
+    var s = new Set();
+    String(text).split(/[\s,;]+/).forEach(function(x){ x = normCode(x); if(x) s.add(x); });
+    return s;
+  }
+  [["ssDept","ssDeptCount"],["ssSuper","ssSuperCount"]].forEach(function(p){
+    $(p[0]).addEventListener("input", function(){ $(p[1]).textContent = fmtN(codeSet($(p[0]).value).size) + "개"; });
+  });
+
+  async function loadXlsx(f){
+    ss.xlsx = f; ss.map = null; ss.loading = true; renderSsList();
+    say("ssMsg", "load", "소재 엑셀을 읽는 중입니다. 용량이 크면 수십 초 걸릴 수 있습니다.");
+    await tick();
+    try{
+      if(typeof XLSX === "undefined") throw new Error("엑셀 처리 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+      var buf = await f.arrayBuffer();
+      var wb = XLSX.read(buf, { type:"array", sheets:1, cellFormula:false, cellHTML:false, cellStyles:false, cellText:false });
+      var sheetName = wb.SheetNames[1];
+      var ws = sheetName && wb.Sheets[sheetName];
+      if(!ws || !ws["!ref"]) throw new Error("두 번째 시트를 찾지 못했습니다.");
+      var range = XLSX.utils.decode_range(ws["!ref"]);
+      var map = new Map();
+      for(var r = range.s.r; r <= range.e.r; r++){
+        var h = ws[XLSX.utils.encode_cell({r:r, c:7})];       // H열 소재 ID
+        if(!h || h.v == null) continue;
+        var key = String(h.v).trim();
+        if(!key || map.has(key)) continue;                    // VLOOKUP처럼 처음 찾은 값
+        var s = ws[XLSX.utils.encode_cell({r:r, c:18})];      // S열 몰상품 ID
+        map.set(key, s && s.v != null ? normCode(s.v) : "");
+      }
+      ss.map = map; ss.loading = false; renderSsList();
+      var note = [];
+      if(String(sheetName).trim() !== "쇼검_소재상세") note.push('두 번째 시트 이름이 "' + esc(sheetName) + '"입니다 (예상: 쇼검_소재상세).');
+      if(note.length) say("ssMsg", "warn", "소재 엑셀을 읽었습니다.", note); else say("ssMsg");
+    }catch(e){
+      console.error(e);
+      ss.map = null; ss.loading = false; renderSsList();
+      say("ssMsg", "warn", "소재 엑셀을 읽지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }
+  }
+
+  bindDrop("ssDrop", "ssInput", function(files){
+    var csv = files.filter(isCsv)[0], xl = files.filter(isXlsx)[0];
+    if(!csv && !xl){ say("ssMsg", "warn", "CSV와 xlsx 파일만 올릴 수 있습니다."); return; }
+    if(csv){ ss.csv = csv; say("ssMsg"); }
+    renderSsList();
+    if(xl) loadXlsx(xl);
+  });
+  $("ssReset").onclick = function(){
+    ss = { csv:null, xlsx:null, map:null, loading:false };
+    $("ssDept").value = ""; $("ssSuper").value = "";
+    $("ssDeptCount").textContent = "0개"; $("ssSuperCount").textContent = "0개";
+    renderSsList(); say("ssMsg");
+  };
+
+  function isMO(campaign){ return /(^|_)mo($|_)/i.test(String(campaign || "").trim()); }
+
+  $("ssRun").onclick = async function(){
+    if(!(ss.csv && ss.map)) return;
+    var dept = codeSet($("ssDept").value), sup = codeSet($("ssSuper").value);
+    if(!dept.size && !sup.size){
+      if(!confirm("백화점·슈퍼브랜드 코드가 비어 있습니다.\n확인을 누르면 구분은 모두 \"-\"로 들어갑니다.")) return;
+    }
+    try{
+      var rows = parseCSV(await readText(ss.csv));
+      if(rows.length < 2) throw new Error("데이터 행이 없습니다.");
+      var warn = [];
+      if(String(rows[0][2]).trim().toLowerCase() !== "content") warn.push('C열 헤더가 "' + esc(rows[0][2]) + '"입니다 (예상: Content).');
+      if(String(rows[0][1]).trim().toLowerCase() !== "campaign") warn.push('B열 헤더가 "' + esc(rows[0][1]) + '"입니다 (예상: Campaign).');
+
+      var overlap = 0; sup.forEach(function(c){ if(dept.has(c)) overlap++; });
+      var tally = {}, order = [], na = 0;
+      var out = rows.map(function(r, i){
+        if(i === 0) return insertAfterC(r, ["몰 상품id", "구분"]);
+        var key = String(r[2] == null ? "" : r[2]).trim();
+        var id = ss.map.has(key) ? ss.map.get(key) : "#N/A";
+        var g = "-";
+        if(id === "#N/A") na++;
+        else{
+          var code = normCode(id);
+          if(isMO(r[1]) && sup.has(code)) g = "슈퍼브랜드";
+          else if(dept.has(code)) g = "백화점";
+        }
+        var camp = String(r[1] || "(없음)");
+        if(!tally[camp]){ tally[camp] = {"백화점":0, "슈퍼브랜드":0, "-":0}; order.push(camp); }
+        tally[camp][g]++;
+        return insertAfterC(r, [id, g]);
+      });
+
+      var name = outName(ss.csv.name);
+      download(toCSV(out), name);
+
+      var info = [];
+      if(na) info.push("소재상세에 없는 소재 ID " + fmtN(na) + "행은 몰 상품id를 #N/A로, 구분을 \"-\"로 넣었습니다.");
+      if(overlap) info.push("백화점과 슈퍼브랜드에 모두 있는 코드 " + fmtN(overlap) + "개는 ss_mo에서 슈퍼브랜드, ss_pc에서 백화점으로 분류했습니다.");
+      say("ssMsg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다.", warn.concat(info));
+
+      var sum = {"백화점":0, "슈퍼브랜드":0, "-":0};
+      var data = order.map(function(c){
+        var t = tally[c]; sum["백화점"] += t["백화점"]; sum["슈퍼브랜드"] += t["슈퍼브랜드"]; sum["-"] += t["-"];
+        return {cells:[c, t["백화점"], t["슈퍼브랜드"], t["-"], t["백화점"] + t["슈퍼브랜드"] + t["-"]]};
+      });
+      data.push({sum:true, cells:["합계", sum["백화점"], sum["슈퍼브랜드"], sum["-"], rows.length - 1]});
+      $("ssMsg").insertAdjacentHTML("beforeend", tallyTable(["캠페인", "백화점", "슈퍼브랜드", "-", "합계"], data));
+    }catch(e){
+      console.error(e);
+      say("ssMsg", "warn", "처리하지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }
+  };
+})();
+</script>
+</body>
+</html>
