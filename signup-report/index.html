@@ -114,7 +114,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
 <section class="panel" id="p-ss">
   <div class="card">
     <h2>파일 올리기</h2>
-    <p class="hint">SS 일별 회원가입 CSV와 네이버 쇼핑검색 소재 엑셀을 함께 올리세요. 엑셀은 두 번째 시트(쇼검_소재상세)에서 H열 소재 ID로 S열 몰상품 ID를 찾아 C열 뒤 "몰 상품id"에 넣고, 없으면 #N/A로 적습니다.</p>
+    <p class="hint">SS 일별 회원가입 CSV와 네이버 쇼핑검색 소재 엑셀을 함께 올리세요. 엑셀은 두 번째 시트(쇼검_소재상세)에서 H열 소재 ID로 S열 몰상품 ID를 찾아 Content 뒤 "몰 상품id"에 넣고, 없으면 #N/A로 적습니다.</p>
     <div class="drop" id="ssDrop" tabindex="0" role="button" aria-label="SS 파일 올리기">
       <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
       <span>CSV 1개 + xlsx 1개 · 한 번에 올려도 됩니다 · 엑셀은 읽는 데 수십 초 걸릴 수 있습니다</span>
@@ -125,7 +125,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
 
   <div class="card">
     <h2>상품코드 붙여넣기</h2>
-    <p class="hint">몰 상품id 뒤 "구분" 열에 씁니다. 캠페인이 ss_mo이고 슈퍼브랜드 코드에 있으면 슈퍼브랜드(백화점과 겹쳐도 우선), 그 밖에 백화점 코드에 있으면 백화점, 나머지와 #N/A는 "-"입니다. 슈퍼브랜드는 MO에만 적용되므로 ss_pc는 겹쳐도 백화점으로 갑니다.</p>
+    <p class="hint">정한 구분은 B열 Campaign 뒤에 붙이고(예: ss_mo백화점, ss_pc-), B열 뒤에 빈 열을 하나 넣습니다. 캠페인이 ss_mo이고 슈퍼브랜드 코드에 있으면 슈퍼브랜드(백화점과 겹쳐도 우선), 그 밖에 백화점 코드에 있으면 백화점, 나머지와 #N/A는 "-"입니다. 슈퍼브랜드는 MO에만 적용되므로 ss_pc는 겹쳐도 백화점으로 갑니다.</p>
     <div class="grid2">
       <div class="field">
         <label for="ssDept">백화점<span class="sub">MO · PC 모두 적용</span></label>
@@ -376,7 +376,9 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
       var overlap = 0; sup.forEach(function(c){ if(dept.has(c)) overlap++; });
       var tally = {}, order = [], na = 0;
       var out = rows.map(function(r, i){
-        if(i === 0) return insertAfterC(r, ["몰 상품id", "구분"]);
+        var row = r.slice(); while(row.length < 3) row.push("");
+        // 최종: A | B(Campaign+구분) | 빈 열 | Content | 몰 상품id | 나머지 원본 그대로 (구분 열은 남기지 않음)
+        if(i === 0) return [row[0], row[1], "", row[2], "몰 상품id"].concat(row.slice(3));
         var key = String(r[2] == null ? "" : r[2]).trim();
         var id = ss.map.has(key) ? ss.map.get(key) : "#N/A";
         var g = "-";
@@ -389,7 +391,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
         var camp = String(r[1] || "(없음)");
         if(!tally[camp]){ tally[camp] = {"백화점":0, "슈퍼브랜드":0, "-":0}; order.push(camp); }
         tally[camp][g]++;
-        return insertAfterC(r, [id, g]);
+        return [row[0], String(row[1]) + g, "", row[2], id].concat(row.slice(3));
       });
 
       var name = outName(ss.csv.name);
