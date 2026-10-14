@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쇼핑검색 소재 변환</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/shell.css">
+<script src="../assets/shell.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow)}
+.card h2{font-size:15px; font-weight:700; margin:0 0 4px}
+.card p.hint{color:var(--muted); font-size:13px; margin:0 0 14px}
+.drop{
+  border:1.5px dashed var(--line); border-radius:10px; background:var(--surface2);
+  padding:30px 20px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.drop:hover,.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.drop strong{display:block; font-size:15px; margin-bottom:3px}
+.drop span{color:var(--muted); font-size:13px}
+.filelist{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:7px}
+.filelist li{display:flex; align-items:center; gap:10px; font-size:13.5px; background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:8px 11px}
+.badge{font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--accent-soft); color:var(--accent); white-space:nowrap}
+.badge.bad{background:var(--warn-soft); color:var(--warn)}
+.fname{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted)}
+.rows{font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.btn{
+  appearance:none; font:inherit; font-weight:500; cursor:pointer; border-radius:7px;
+  padding:9px 16px; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.actions{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-top:14px; display:none}
+.msg.on{display:block}
+.msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
+.msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
+.msg.load{background:var(--surface2); color:var(--muted); border:1px solid var(--line)}
+.msg ul{margin:6px 0 0; padding-left:18px}
+@media (max-width:620px){ .home-head h1{font-size:20px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="home-head">
+  <h1>쇼핑검색 소재 변환</h1>
+  <span class="sub">네이버 쇼핑검색 소재 엑셀의 열 순서를 바꿔 값으로 저장합니다</span>
+</header>
+
+<div class="card">
+  <h2>소재 파일 올리기</h2>
+  <p class="hint">첫 시트(쇼검_소재)만 사용합니다. 디바이스(B열)는 구분과 소재 ID 사이로, 카테고리(C열)는 쇼핑몰 상품ID와 소재 입찰가 사이로 옮겨집니다. 수식은 모두 값으로 바뀝니다.</p>
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="소재 파일 올리기">
+    <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
+    <span>xlsx 1개 · 용량이 크면 읽는 데 수십 초 걸릴 수 있습니다</span>
+  </div>
+  <input type="file" id="fileinput" accept=".xlsx,.xls" hidden>
+  <ul class="filelist" id="filelist"></ul>
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+</div>
+
+<div class="card">
+  <div class="actions">
+    <button class="btn primary" id="run" disabled>변환 &amp; 다운로드</button>
+    <button class="btn" id="reset">초기화</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+(function(){
+  // 원본 열(0=A) → 새 순서: A, D~J, B, K~O, C, P, Q
+  var ORDER = [0,3,4,5,6,7,8,9,1,10,11,12,13,14,2,15,16];
+  var L = function(i){ return String.fromCharCode(65+i); };
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("fileinput");
+  var list = document.getElementById("filelist");
+  var msg = document.getElementById("msg");
+  var runBtn = document.getElementById("run");
+  var file = null;
+
+  function show(type, html){ msg.className = "msg on " + type; msg.innerHTML = html; }
+  function hide(){ msg.className = "msg"; msg.innerHTML = ""; }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function norm(v){ return String(v == null ? "" : v).replace(/\s+/g, ""); }
+  function tick(){ return new Promise(function(r){ setTimeout(r, 30); }); }
+
+  drop.addEventListener("click", function(){ input.click(); });
+  drop.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); } });
+  ["dragenter","dragover"].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave","drop"].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function(e){ if(e.dataTransfer.files[0]) pick(e.dataTransfer.files[0]); });
+  input.addEventListener("change", function(){ if(input.files[0]) pick(input.files[0]); input.value = ""; });
+
+  function pick(f){
+    hide();
+    if(!/\.(xlsx|xls)$/i.test(f.name)){
+      file = null; runBtn.disabled = true; list.innerHTML = "";
+      show("warn", "엑셀 파일(xlsx, xls)만 올릴 수 있습니다.");
+      return;
+    }
+    file = f;
+    list.innerHTML = '<li><span class="badge">대기</span><span class="fname">' + esc(f.name) + '</span><span class="rows">' + (f.size/1048576).toFixed(1) + 'MB</span></li>';
+    runBtn.disabled = false;
+  }
+
+  document.getElementById("reset").addEventListener("click", function(){
+    file = null; list.innerHTML = ""; runBtn.disabled = true; hide();
+  });
+
+  runBtn.addEventListener("click", async function(){
+    if(!file) return;
+    if(typeof XLSX === "undefined"){ show("warn", "엑셀 처리 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요."); return; }
+    runBtn.disabled = true; runBtn.textContent = "처리 중...";
+    show("load", "파일을 읽는 중입니다.");
+    await tick();
+    try{
+      var buf = await file.arrayBuffer();
+      // 첫 시트만, 수식 없이 계산된 값만 읽음
+      var wb = XLSX.read(buf, { type:"array", sheets:0, cellFormula:false, cellHTML:false, cellStyles:false });
+      var sheetName = wb.SheetNames[0];
+      var ws = wb.Sheets[sheetName];
+      var rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, blankrows:true });
+      if(!rows.length) throw new Error("첫 시트가 비어 있습니다.");
+
+      // 헤더 확인
+      var hdr = -1;
+      for(var r = 0; r < Math.min(rows.length, 10); r++){ if(norm(rows[r][1]) === "디바이스"){ hdr = r; break; } }
+      var warn = [];
+      if(hdr < 0) warn.push('B열에서 "디바이스" 헤더를 찾지 못해 열 위치 기준으로만 바꿨습니다.');
+      else{
+        var expect = {2:"카테고리", 9:"구분", 10:"소재ID", 14:"쇼핑몰상품ID", 15:"소재입찰가"};
+        Object.keys(expect).forEach(function(k){
+          var v = rows[hdr][k];
+          if(norm(v) !== expect[k]) warn.push(L(+k) + '열 헤더가 "' + esc(v == null ? "" : v) + '"입니다 (예상: ' + expect[k] + ")");
+        });
+      }
+
+      show("load", "열 순서를 바꾸는 중입니다.");
+      await tick();
+      var width = rows.reduce(function(m, row){ return Math.max(m, row.length); }, 0);
+      var order = ORDER.slice();
+      for(var i = 17; i < width; i++) order.push(i);
+      var out = rows.map(function(row){ return order.map(function(c){ return row[c] === undefined ? null : row[c]; }); });
+
+      var nws = XLSX.utils.aoa_to_sheet(out);
+      if(ws["!cols"]) nws["!cols"] = order.map(function(c){ return ws["!cols"][c] || {}; });
+      var nwb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(nwb, nws, sheetName.trim() || "쇼검_소재");
+      var outName = file.name.replace(/\.(xlsx|xls)$/i, "") + "_변환.xlsx";
+      XLSX.writeFile(nwb, outName, { compression:true });
+
+      var n = hdr >= 0 ? rows.length - hdr - 1 : rows.length;
+      list.querySelector(".badge").textContent = "완료";
+      list.querySelector(".rows").textContent = n.toLocaleString("ko-KR") + "행";
+      var html = esc(outName) + " 파일로 저장했습니다.";
+      if(warn.length){
+        show("warn", html + " 다만 헤더가 예상과 달라 확인이 필요합니다.<ul><li>" + warn.join("</li><li>") + "</li></ul>");
+      }else show("ok", html);
+    }catch(e){
+      console.error(e);
+      var b = list.querySelector(".badge"); if(b){ b.textContent = "실패"; b.className = "badge bad"; }
+      show("warn", "변환하지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }finally{
+      runBtn.disabled = !file; runBtn.textContent = "변환 & 다운로드";
+    }
+  });
+})();
+</script>
+</body>
+</html>
