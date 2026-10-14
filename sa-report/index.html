@@ -535,6 +535,12 @@ function download(out, s, e){
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = [{wch:12},{wch:30},{wch:22},{wch:12},{wch:10},{wch:14}];
   for(let i=2;i<=aoa.length;i++) ["D","E","F"].forEach(c=>{ if(ws[c+i]) ws[c+i].z = "#,##0"; });
+  // 날짜(A열)를 텍스트가 아닌 엑셀 날짜로 저장
+  for(let i=2;i<=aoa.length;i++){
+    const c = ws["A"+i];
+    const m = c && typeof c.v === "string" && c.v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(m){ c.t = "n"; c.v = Date.UTC(+m[1], +m[2]-1, +m[3]) / 86400000 + 25569; c.z = "yyyy-mm-dd"; delete c.w; }
+  }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "통합");
   const tag = (s===e) ? s.replace(/-/g,"") : s.replace(/-/g,"")+"-"+e.replace(/-/g,"");
