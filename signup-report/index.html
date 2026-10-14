@@ -92,7 +92,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
 <section class="panel on" id="p-sa">
   <div class="card">
     <h2>SA 일별 회원가입 파일</h2>
-    <p class="hint">C열(Content) 뒤에 "구분" 열을 넣습니다. SUPERBRAND가 들어 있으면 슈퍼브랜드, SB가 밑줄로 나뉜 단어로 있으면(SB, SB_xxx) 백화점, 둘 다 아니면 "-"입니다. 대소문자는 구분하지 않고, SUPERBRAND를 먼저 봅니다.</p>
+    <p class="hint">Content 값으로 구분을 정해 B열 Campaign 뒤에 붙이고(예: sa_mo백화점, sa_mo-), B열 뒤에 빈 열을 하나 넣습니다. SUPERBRAND가 들어 있으면 슈퍼브랜드, SB가 밑줄로 나뉜 단어로 있으면(SB, SB_xxx) 백화점, 둘 다 아니면 "-"입니다. 대소문자는 구분하지 않고, SUPERBRAND를 먼저 봅니다.</p>
     <div class="drop" id="saDrop" tabindex="0" role="button" aria-label="SA 파일 올리기">
       <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
       <span>CSV 1개</span>
@@ -264,10 +264,12 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
       var warn = [];
       if(String(rows[0][2]).trim().toLowerCase() !== "content") warn.push('C열 헤더가 "' + esc(rows[0][2]) + '"입니다 (예상: Content).');
       var counts = {"백화점":0, "슈퍼브랜드":0, "-":0};
+      // 최종: A | B(Campaign+구분) | 빈 열 | Content | 나머지 원본 그대로 (구분 열은 남기지 않음)
       var out = rows.map(function(r, i){
-        if(i === 0) return insertAfterC(r, ["구분"]);
-        var g = saClass(r[2]); counts[g]++;
-        return insertAfterC(r, [g]);
+        var row = r.slice(); while(row.length < 3) row.push("");
+        if(i === 0) return [row[0], row[1], ""].concat(row.slice(2));
+        var g = saClass(row[2]); counts[g]++;
+        return [row[0], String(row[1]) + g, ""].concat(row.slice(2));
       });
       var name = outName(saFile.name);
       download(toCSV(out), name);
