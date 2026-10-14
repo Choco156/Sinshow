@@ -53,12 +53,12 @@
 
 <header class="home-head">
   <h1>쇼핑검색 소재 변환</h1>
-  <span class="sub">네이버 쇼핑검색 소재 엑셀의 열 순서를 바꿔 값으로 저장합니다</span>
+  <span class="sub">네이버 쇼핑검색 소재 엑셀에서 필요한 열만 뽑아 값으로 저장합니다</span>
 </header>
 
 <div class="card">
   <h2>소재 파일 올리기</h2>
-  <p class="hint">첫 시트(쇼검_소재)만 사용합니다. 디바이스(B열)는 구분과 소재 ID 사이로, 카테고리(C열)는 쇼핑몰 상품ID와 소재 입찰가 사이로 옮겨집니다. 수식은 모두 값으로 바뀝니다.</p>
+  <p class="hint">첫 시트(쇼검_소재)만 사용합니다. 디바이스 · 소재 ID · 기본상품명 · 노출상품명 · 카테고리 · 쇼핑몰 상품ID · 카테고리(C열) 순서로 7개 열만 남기고, 수식은 모두 값으로 바꿉니다.</p>
   <div class="drop" id="drop" tabindex="0" role="button" aria-label="소재 파일 올리기">
     <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
     <span>xlsx 1개 · 용량이 크면 읽는 데 수십 초 걸릴 수 있습니다</span>
@@ -79,8 +79,8 @@
 
 <script>
 (function(){
-  // 원본 열(0=A) → 새 순서: A, D~J, B, K~O, C, P, Q
-  var ORDER = [0,3,4,5,6,7,8,9,1,10,11,12,13,14,2,15,16];
+  // 남길 원본 열(0=A)과 순서: B, K, L, M, N, O, C
+  var ORDER = [1,10,11,12,13,14,2];
   var L = function(i){ return String.fromCharCode(65+i); };
 
   var drop = document.getElementById("drop");
@@ -147,12 +147,12 @@
         });
       }
 
-      show("load", "열 순서를 바꾸는 중입니다.");
+      show("load", "필요한 열을 뽑는 중입니다.");
       await tick();
-      var width = rows.reduce(function(m, row){ return Math.max(m, row.length); }, 0);
-      var order = ORDER.slice();
-      for(var i = 17; i < width; i++) order.push(i);
-      var out = rows.map(function(row){ return order.map(function(c){ return row[c] === undefined ? null : row[c]; }); });
+      // 헤더 위 안내 문구 행은 빼고, 헤더부터 7개 열만 남김
+      var order = ORDER;
+      var body = hdr >= 0 ? rows.slice(hdr) : rows;
+      var out = body.map(function(row){ return order.map(function(c){ return row[c] === undefined ? null : row[c]; }); });
 
       var nws = XLSX.utils.aoa_to_sheet(out);
       if(ws["!cols"]) nws["!cols"] = order.map(function(c){ return ws["!cols"][c] || {}; });
