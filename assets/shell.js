@@ -21,7 +21,9 @@ var NAV = [
   { path:"merger/",     label:"SPO 도구",       icon:"⊞",
     desc:"매체 리포트를 하나로 합치고, 상품코드로 캠페인을 분류합니다." },
   { path:"sa-report/",  label:"SA 일일 리포트", icon:"▤",
-    desc:"네이버·구글·브랜드검색 리포트를 합쳐 붙여넣기용 엑셀로 만듭니다." }
+    desc:"네이버·구글·브랜드검색 리포트를 합쳐 붙여넣기용 엑셀로 만듭니다." },
+  { path:"shopping-reorder/", label:"쇼핑검색 소재 변환", icon:"⇄",
+    desc:"쇼검_소재 시트의 디바이스·카테고리 열을 옮겨 값으로 저장합니다." }
 ];
 
 (function(){
