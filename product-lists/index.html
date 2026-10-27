@@ -410,6 +410,11 @@ tbody tr:last-child td{border-bottom:0}
             diff = " · " + base.label + " 대비 <span class='plus'>추가 " + fmtN(add) + "</span> / <span class='minus'>빠짐 " + fmtN(del) + "</span>";
             if(base.v.codes.size && del > base.v.codes.size * 0.3) notes.push("<span class='w'>" + base.label + " 목록의 " + Math.round(del / base.v.codes.size * 100) + "%가 빠집니다. 바뀐 부분만 넣지 않았는지 확인하세요 (전체 목록을 넣어야 합니다)</span>");
           }
+          if(g.start < TODAY){
+            var pe = effEnd(after.slice().sort(function(a, b){ return a.start < b.start ? -1 : 1; }), nv), last = addDays(TODAY, -1);
+            if(pe && pe < last) last = pe;
+            notes.push("<span class='w'>시작일이 오늘보다 과거입니다. " + ymd(g.start) + (last > g.start ? " ~ " + ymd(last) : "") + " 리포트를 이미 만들었다면 새 목록으로 다시 만들어 주세요</span>");
+          }
           if(g.end && !versionFor(after, addDays(g.end, 1))) notes.push("<span class='w'>" + ymd(g.end) + " 이후에는 " + KINDS[k] + " 목록이 없습니다. 그 날짜부터는 모두 “-”로 분류됩니다</span>");
           items.push("<div class='item'><b>" + KINDS[k] + " · " + ymd(g.start) + " ~ " + (g.end ? ymd(g.end) : "계속") + " · " + fmtN(codes.size) + "개" + diff + "</b>" +
                      notes.map(function(n){ return "<span>" + n + "</span>"; }).join("") + "</div>");
@@ -431,14 +436,16 @@ tbody tr:last-child td{border-bottom:0}
           if(!sg[key].map.has(x.code)) sg[key].map.set(x.code, { code:x.code, name:x.name, brand:x.brand });
           var dv = versionFor(shop, x.start); if(dv && dv.v.codes.has(x.code)) clash++;
         });
-        var lines = [];
+        var lines = [], past = [];
         Object.keys(sg).sort().forEach(function(key){
           var g = sg[key];
           var same = supRows().filter(function(r){ return r.brand === g.brand && r.start_date === g.start && r.end_date === g.end; });
           same.forEach(function(r){ plan.replaceIds.push(r.id); });
           plan.insert.push({ kind:"super", start_date:g.start, end_date:g.end, brand:g.brand, items:Array.from(g.map.values()), item_count:g.map.size, memo:file.name });
           lines.push("<span>" + esc(g.brand) + " · " + ymd(g.start) + " ~ " + ymd(g.end) + " · " + g.map.size + "개" + (same.length ? " · 같은 브랜드·기간이 있어 덮어씁니다" : "") + "</span>");
+          if(g.start < TODAY){ var le = g.end < addDays(TODAY, -1) ? g.end : addDays(TODAY, -1); past.push(esc(g.brand) + " " + ymd(g.start) + (le > g.start ? " ~ " + ymd(le) : "")); }
         });
+        if(past.length) lines.push("<span class='w'>시작일이 오늘보다 과거인 슈퍼브랜드가 있습니다 (" + past.join(", ") + "). 그 기간 리포트를 이미 만들었다면 다시 만들어 주세요</span>");
         items.push("<div class='item'><b>" + KINDS.super + " · " + fmtN(sr.rows.length) + "개</b>" + lines.join("") +
           (clash ? "<span class='w'>① 백화점과 겹치는 상품 " + clash + "개 · MO는 슈퍼브랜드, PC는 백화점으로 분류됩니다</span>" : "") + "</div>");
       }
