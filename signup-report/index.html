@@ -80,16 +80,61 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
 
 <header class="home-head">
   <h1>회원가입 리포트 가공</h1>
-  <span class="sub">SA·SS 일별 회원가입 CSV에 구분과 몰 상품id를 붙입니다</span>
+  <span class="sub">에어브릿지 회원가입·일간보고서를 가공해 AB_RAW용 데이터를 만듭니다</span>
 </header>
 
 <div class="tabs" role="tablist">
-  <button class="tab" role="tab" aria-selected="true" data-panel="p-sa">SA 구분</button>
+  <button class="tab" role="tab" aria-selected="true" data-panel="p-ab">AB_RAW 취합</button>
+  <button class="tab" role="tab" aria-selected="false" data-panel="p-sa">SA 구분</button>
   <button class="tab" role="tab" aria-selected="false" data-panel="p-ss">SS 몰 상품id · 구분</button>
 </div>
 
+<!-- ───────── 0. AB_RAW 취합 ───────── -->
+<section class="panel on" id="p-ab">
+  <div class="card">
+    <h2>파일 올리기</h2>
+    <p class="hint">에어브릿지에서 받은 원본 CSV 3개(SA 일별 회원가입, SS 일별 회원가입, 일간보고서 RAW)와 최신 네이버 쇼핑검색 소재 엑셀을 올리세요. 한 번에 끌어다 놓아도 파일 내용을 보고 알아서 구분합니다.</p>
+    <div class="drop" id="abDrop" tabindex="0" role="button" aria-label="AB_RAW 취합 파일 올리기">
+      <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
+      <span>CSV 3개 + xlsx 1개 · 엑셀은 읽는 데 수십 초 걸릴 수 있습니다</span>
+    </div>
+    <input type="file" id="abInput" accept=".csv,.txt,.xlsx,.xls" multiple hidden>
+    <ul class="filelist" id="abList"></ul>
+  </div>
+
+  <div class="card">
+    <h2>상품코드 붙여넣기</h2>
+    <p class="hint">SS 구분에 씁니다. 캠페인이 ss_mo이고 슈퍼브랜드 코드에 있으면 슈퍼브랜드(백화점과 겹쳐도 우선), 그 밖에 백화점 코드에 있으면 백화점, 나머지와 몰 상품id를 못 찾은 행은 구분 없음입니다. SA 구분은 Content 값으로 정합니다.</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="abDept">백화점<span class="sub">MO · PC 모두 적용</span></label>
+        <textarea id="abDept" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+        <div class="count" id="abDeptCount">0개</div>
+      </div>
+      <div class="field">
+        <label for="abSuper">슈퍼브랜드<span class="sub">ss_mo 캠페인에만 적용</span></label>
+        <textarea id="abSuper" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+        <div class="count" id="abSuperCount">0개</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="btn primary" id="abRun" disabled>취합 &amp; 일간보고서 다운로드</button>
+      <button class="btn" id="abReset">초기화</button>
+    </div>
+    <div id="abMsg"></div>
+    <div class="actions" id="abCopy" style="display:none; margin-top:14px">
+      <button class="btn" id="abCopy1">날짜~디바이스 복사 (AB_RAW C:F)</button>
+      <button class="btn" id="abCopy2">노출~매출액 복사 (AB_RAW I:N)</button>
+    </div>
+    <div id="abTable"></div>
+  </div>
+</section>
+
 <!-- ───────── 1. SA 구분 ───────── -->
-<section class="panel on" id="p-sa">
+<section class="panel" id="p-sa">
   <div class="card">
     <h2>SA 일별 회원가입 파일</h2>
     <p class="hint">Content 값으로 구분을 정해 B열 Campaign 뒤에 붙이고(예: sa_mo백화점, sa_mo-), B열 뒤에 빈 열을 하나 넣습니다. SUPERBRAND가 들어 있으면 슈퍼브랜드, SB가 밑줄로 나뉜 단어로 있으면(SB, SB_xxx) 백화점, 둘 다 아니면 "-"입니다. 대소문자는 구분하지 않고, SUPERBRAND를 먼저 봅니다.</p>
@@ -236,6 +281,242 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
     });
     return h + "</tbody></table></div>";
   }
+
+  /* ── 0. AB_RAW 취합 ───────────────────────── */
+  var AB_INDEX = {   // INDEX 시트 I:J
+    "sa_pc백화점":"sa_pc_백화점", "sa_mo백화점":"sa_mo_백화점", "ss_mo백화점":"ss_mo_백화점", "ss_pc백화점":"ss_pc_백화점",
+    "sa_pc-":"sa_pc", "sa_mo-":"sa_mo", "sa_mo슈퍼브랜드":"sa_mo_슈퍼브랜드", "ss_mo슈퍼브랜드":"ss_mo_슈퍼브랜드",
+    "ss_mo-":"ss_mo", "ss_pc-":"ss_pc"
+  };
+  var AB_BASES = ["sa_mo","sa_pc","ss_mo","ss_pc"];
+  var AB_METRICS = ["Impressions (Channel)","Clicks (Channel)","Cost (Channel)","회원가입 (App+Web)","구매 완료 (App+Web)","구매액 (App+Web)"];
+  var ab = { sa:null, ss:null, daily:null, xlsx:null, map:null, loading:false, out:null };
+
+  function hIndex(h, name){ for(var i = 0; i < h.length; i++){ if(String(h[i]).trim() === name) return i; } return -1; }
+  function numv(v){ var n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; }
+  function fmtNum(n){ var r = Math.round(n * 100) / 100; return String(r); }
+  function baseOf(c){ return String(c || "").trim().replace(/_(백화점|슈퍼브랜드)$/, ""); }
+  function mapCampaign(raw, g){
+    var key = String(raw || "").trim() + g;
+    if(AB_INDEX[key]) return {name:AB_INDEX[key], known:true};
+    return {name:String(raw || "").trim() + (g === "-" ? "" : "_" + g), known:false};
+  }
+
+  async function abSniff(file){
+    if(isXlsx(file)) return "xlsx";
+    var head = (await readText(file)).split(/\r?\n/)[0];
+    var h = parseCSV(head)[0] || [];
+    if(String(h[0]).trim() === "Event Date") return "daily";
+    if(hIndex(h, "Content") >= 0 && hIndex(h, "Term") >= 0) return "sa";
+    if(hIndex(h, "Content") >= 0) return "ss";
+    return "";
+  }
+
+  function renderAbList(){
+    var h = "";
+    h += ab.sa ? fileLi("", "SA 회원가입", ab.sa.name, "") : fileLi("wait", "SA 회원가입", "아직 없음", "");
+    h += ab.ss ? fileLi("", "SS 회원가입", ab.ss.name, "") : fileLi("wait", "SS 회원가입", "아직 없음", "");
+    h += ab.daily ? fileLi("", "일간보고서", ab.daily.name, "") : fileLi("wait", "일간보고서", "아직 없음", "");
+    if(!ab.xlsx) h += fileLi("wait", "소재 엑셀", "아직 없음", "");
+    else if(ab.loading) h += fileLi("wait", "읽는 중", ab.xlsx.name, "");
+    else if(ab.map) h += fileLi("", "소재 엑셀", ab.xlsx.name, "소재 ID " + fmtN(ab.map.size) + "개");
+    else h += fileLi("bad", "실패", ab.xlsx.name, "");
+    $("abList").innerHTML = h;
+    $("abRun").disabled = !(ab.sa && ab.ss && ab.daily && ab.map && !ab.loading);
+  }
+  renderAbList();
+
+  [["abDept","abDeptCount"],["abSuper","abSuperCount"]].forEach(function(p){
+    $(p[0]).addEventListener("input", function(){ $(p[1]).textContent = fmtN(codeSet($(p[0]).value).size) + "개"; });
+  });
+
+  async function abLoadXlsx(f){
+    ab.xlsx = f; ab.map = null; ab.loading = true; renderAbList();
+    say("abMsg", "load", "소재 엑셀을 읽는 중입니다. 용량이 크면 수십 초 걸릴 수 있습니다.");
+    await tick();
+    try{
+      if(typeof XLSX === "undefined") throw new Error("엑셀 처리 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+      var wb = XLSX.read(await f.arrayBuffer(), { type:"array", sheets:1, cellFormula:false, cellHTML:false, cellStyles:false, cellText:false });
+      var ws = wb.SheetNames[1] && wb.Sheets[wb.SheetNames[1]];
+      if(!ws || !ws["!ref"]) throw new Error("두 번째 시트를 찾지 못했습니다.");
+      var range = XLSX.utils.decode_range(ws["!ref"]), map = new Map();
+      for(var r = range.s.r; r <= range.e.r; r++){
+        var h = ws[XLSX.utils.encode_cell({r:r, c:7})];
+        if(!h || h.v == null) continue;
+        var key = String(h.v).trim();
+        if(!key || map.has(key)) continue;
+        var sc = ws[XLSX.utils.encode_cell({r:r, c:18})];
+        map.set(key, sc && sc.v != null ? normCode(sc.v) : "");
+      }
+      ab.map = map; ab.loading = false; renderAbList(); say("abMsg");
+    }catch(e){
+      console.error(e);
+      ab.map = null; ab.loading = false; renderAbList();
+      say("abMsg", "warn", "소재 엑셀을 읽지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }
+  }
+
+  bindDrop("abDrop", "abInput", async function(files){
+    var unknown = [], xl = null;
+    for(var i = 0; i < files.length; i++){
+      var kind = await abSniff(files[i]);
+      if(kind === "xlsx") xl = files[i];
+      else if(kind) ab[kind] = files[i];
+      else unknown.push(esc(files[i].name));
+    }
+    renderAbList();
+    if(unknown.length) say("abMsg", "warn", "어떤 파일인지 알 수 없어 건너뛰었습니다.", unknown); else if(!xl) say("abMsg");
+    if(xl) abLoadXlsx(xl);
+  });
+
+  $("abReset").onclick = function(){
+    ab = { sa:null, ss:null, daily:null, xlsx:null, map:null, loading:false, out:null };
+    $("abDept").value = ""; $("abSuper").value = "";
+    $("abDeptCount").textContent = "0개"; $("abSuperCount").textContent = "0개";
+    $("abCopy").style.display = "none"; $("abTable").innerHTML = "";
+    renderAbList(); say("abMsg");
+  };
+
+  // 회원가입 파일 → {key: {date, channel, campaign, device, m:[6]}}
+  function abAggregate(rows, classify, agg, warn, label){
+    var h = rows[0];
+    var ix = { ch:hIndex(h,"Channel"), camp:hIndex(h,"Campaign"), dev:hIndex(h,"Device Type"), date:hIndex(h,"Event Date") };
+    var mi = AB_METRICS.map(function(n){ return hIndex(h, n); });
+    if(ix.ch < 0 || ix.camp < 0 || ix.dev < 0 || ix.date < 0) throw new Error(label + " 파일에서 Channel·Campaign·Device Type·Event Date 열을 찾지 못했습니다.");
+    var unknown = {};
+    for(var i = 1; i < rows.length; i++){
+      var r = rows[i]; if(r.length < 2) continue;
+      var g = classify(r);
+      var mc = mapCampaign(r[ix.camp], g);
+      if(!mc.known) unknown[mc.name] = true;
+      var key = [r[ix.date], r[ix.ch], mc.name, r[ix.dev]].join("\u0001");
+      if(!agg[key]) agg[key] = { date:r[ix.date], channel:r[ix.ch], campaign:mc.name, device:r[ix.dev], m:[0,0,0,0,0,0] };
+      mi.forEach(function(c, k){ if(c >= 0) agg[key].m[k] += numv(r[c]); });
+    }
+    Object.keys(unknown).forEach(function(n){ warn.push(label + ': INDEX 변환표에 없는 캠페인 "' + esc(n) + '"이 나와 그대로 이름을 붙였습니다.'); });
+  }
+
+  $("abRun").onclick = async function(){
+    if($("abRun").disabled) return;
+    var dept = codeSet($("abDept").value), sup = codeSet($("abSuper").value);
+    if(!dept.size && !sup.size){
+      if(!confirm("백화점·슈퍼브랜드 코드가 비어 있습니다.\n확인을 누르면 SS는 모두 구분 없이(ss_mo, ss_pc) 합쳐집니다.")) return;
+    }
+    $("abCopy").style.display = "none"; $("abTable").innerHTML = "";
+    say("abMsg", "load", "취합하는 중입니다.");
+    await tick();
+    try{
+      var saRows = parseCSV(await readText(ab.sa));
+      var ssRows = parseCSV(await readText(ab.ss));
+      var dRows = parseCSV(await readText(ab.daily));
+      var warn = [], info = [];
+
+      // 1) SA·SS 구분 후 합치기
+      var agg = {};
+      var saC = hIndex(saRows[0], "Content");
+      abAggregate(saRows, function(r){ return saClass(r[saC]); }, agg, warn, "SA");
+      var ssC = hIndex(ssRows[0], "Content"), ssCamp = hIndex(ssRows[0], "Campaign"), na = 0;
+      abAggregate(ssRows, function(r){
+        var key = String(r[ssC] == null ? "" : r[ssC]).trim();
+        if(!ab.map.has(key)){ na++; return "-"; }
+        var code = normCode(ab.map.get(key));
+        if(isMO(r[ssCamp]) && sup.has(code)) return "슈퍼브랜드";
+        if(dept.has(code)) return "백화점";
+        return "-";
+      }, agg, warn, "SS");
+      if(na) warn.push("SS에서 소재상세에 없는 소재 ID " + fmtN(na) + "행은 구분 없이 합쳤습니다. 많다면 소재 엑셀이 최신인지 확인해 주세요.");
+
+      // 2) 일간보고서 대체
+      var dh = dRows[0];
+      var need = ["Event Date","Channel","Campaign","Device Type"].concat(AB_METRICS);
+      var di = need.map(function(n){ return hIndex(dh, n); });
+      var miss = need.filter(function(n, k){ return di[k] < 0; });
+      if(miss.length) throw new Error("일간보고서에서 열을 찾지 못했습니다: " + miss.join(", "));
+
+      var groups = {};   // date|channel|base → {newRows, oldSum, newSum, placed}
+      Object.keys(agg).forEach(function(k){
+        var a = agg[k], gk = [a.date, a.channel, baseOf(a.campaign)].join("\u0001");
+        if(!groups[gk]) groups[gk] = { rows:[], oldSum:[0,0,0,0,0,0], newSum:[0,0,0,0,0,0], hadOld:false, placed:false };
+        groups[gk].rows.push(a);
+        a.m.forEach(function(v, i){ groups[gk].newSum[i] += v; });
+      });
+
+      function newRowArray(a){
+        var arr = dh.map(function(){ return ""; });
+        arr[di[0]] = a.date; arr[di[1]] = a.channel; arr[di[2]] = a.campaign; arr[di[3]] = a.device;
+        AB_METRICS.forEach(function(n, k){ arr[di[4 + k]] = fmtNum(a.m[k]); });
+        return arr;
+      }
+
+      var out = [dh], kept = [];
+      for(var i = 1; i < dRows.length; i++){
+        var r = dRows[i]; if(r.length < 2) continue;
+        var base = baseOf(r[di[2]]);
+        var gk = [r[di[0]], r[di[1]], base].join("\u0001");
+        var g = groups[gk];
+        if(AB_BASES.indexOf(base) >= 0 && g){
+          g.hadOld = true;
+          AB_METRICS.forEach(function(n, k){ g.oldSum[k] += numv(r[di[4 + k]]); });
+          if(!g.placed){ g.rows.forEach(function(a){ out.push(newRowArray(a)); }); g.placed = true; }
+          continue;
+        }
+        if(AB_BASES.indexOf(base) >= 0) kept.push(r[di[0]] + " " + r[di[1]] + " " + r[di[2]] + " " + r[di[3]]);
+        out.push(r);
+      }
+      Object.keys(groups).forEach(function(gk){
+        var g = groups[gk];
+        if(!g.placed){ g.rows.forEach(function(a){ out.push(newRowArray(a)); }); g.placed = true; }
+      });
+      if(kept.length) info.push("회원가입 파일에 없어 그대로 둔 sa·ss 행: " + kept.map(esc).join(", "));
+
+      // 3) 검증 (회원가입·구매·구매액, 날짜별)
+      var byDate = {}, mism = [];
+      Object.keys(groups).forEach(function(gk){
+        var g = groups[gk], p = gk.split("\u0001");
+        if(!byDate[p[0]]) byDate[p[0]] = { o:[0,0,0], n:[0,0,0] };
+        for(var k = 0; k < 3; k++){ byDate[p[0]].o[k] += g.oldSum[3 + k]; byDate[p[0]].n[k] += g.newSum[3 + k]; }
+        if(!g.hadOld) mism.push(p.join(" ") + ": 일간보고서에 해당 행이 없어 새로 추가했습니다.");
+        else if([3,4,5].some(function(k){ return Math.abs(g.oldSum[k] - g.newSum[k]) > 0.5; }))
+          mism.push(p.join(" ") + ": 회원가입 " + fmtN(g.oldSum[3]) + "→" + fmtN(g.newSum[3]) + ", 구매 " + fmtN(g.oldSum[4]) + "→" + fmtN(g.newSum[4]) + ", 구매액 " + fmtN(Math.round(g.oldSum[5])) + "→" + fmtN(Math.round(g.newSum[5])));
+      });
+      warn = warn.concat(mism);
+
+      // 4) 저장
+      ab.out = out; ab.di = di;
+      var name = ab.daily.name.replace(/\.(csv|txt)$/i, "") + "_취합.csv";
+      var csv = "\uFEFF" + out.map(function(r){
+        return r.map(function(v){ v = String(v == null ? "" : v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",");
+      }).join("\r\n") + "\r\n";
+      download(csv, name);
+
+      var title = esc(name) + " 파일로 저장했습니다. 아래 복사 버튼으로 AB_RAW에 붙여넣을 수도 있습니다.";
+      say("abMsg", warn.length ? "warn" : "ok", warn.length ? title + " 확인이 필요한 항목이 있습니다." : title, warn.concat(info));
+      $("abCopy").style.display = "flex";
+
+      var dates = Object.keys(byDate).sort();
+      var html = "<div class='tablebox'><table><thead><tr><th>날짜</th><th class='n'>회원가입</th><th class='n'>구매 완료</th><th class='n'>구매액</th><th>대체 전후 일치</th></tr></thead><tbody>";
+      dates.forEach(function(d){
+        var b = byDate[d], ok = [0,1,2].every(function(k){ return Math.abs(b.o[k] - b.n[k]) <= 0.5; });
+        html += "<tr><td>" + esc(d) + "</td><td class='n'>" + fmtN(b.n[0]) + "</td><td class='n'>" + fmtN(b.n[1]) + "</td><td class='n'>" + fmtN(Math.round(b.n[2])) + "</td><td>" + (ok ? "일치" : "<b style='color:var(--warn)'>불일치</b>") + "</td></tr>";
+      });
+      html += "</tbody></table></div>";
+      $("abTable").innerHTML = "<p class='hint' style='margin:14px 0 0'>sa·ss 행 날짜별 합계 (일간보고서 " + fmtN(dRows.length - 1) + "행 → " + fmtN(out.length - 1) + "행)</p>" + html;
+    }catch(e){
+      console.error(e);
+      say("abMsg", "warn", "처리하지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }
+  };
+
+  async function abCopy(btn, from, to, label){
+    if(!ab.out) return;
+    var cols = ab.di.slice(from, to);
+    var tsv = ab.out.slice(1).map(function(r){ return cols.map(function(c){ return r[c] == null ? "" : r[c]; }).join("\t"); }).join("\n");
+    try{ await navigator.clipboard.writeText(tsv); btn.textContent = "복사했습니다"; }
+    catch(e){ btn.textContent = "복사 실패"; }
+    setTimeout(function(){ btn.textContent = label; }, 1600);
+  }
+  $("abCopy1").onclick = function(){ abCopy(this, 0, 4, "날짜~디바이스 복사 (AB_RAW C:F)"); };
+  $("abCopy2").onclick = function(){ abCopy(this, 4, 10, "노출~매출액 복사 (AB_RAW I:N)"); };
 
   /* ── 1. SA 구분 ───────────────────────── */
   function saClass(content){
