@@ -43,7 +43,24 @@ var NAV = [
     return p.endsWith("/") ? p : p + "/";
   }
 
+  // K 로고 (파비콘과 사이드바 로고에 같이 씁니다)
+  var LOGO_SVG = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
+                 "<rect width='32' height='32' rx='7' fill='#156B43'/>" +
+                 "<path d='M8 6H13.4V13.6L19 6H25.4L18.2 15.2L25.8 26H19.3L14.6 18.9L13.4 20.4V26H8Z' fill='#fff'/></svg>";
+
+  // 파비콘: 페이지에 따로 지정된 게 없을 때만 공용 K 아이콘을 붙입니다 (SPO 도구는 자기 것 유지)
+  function addFavicon(){
+    if(document.querySelector('link[rel~="icon"]')) return;
+    var svg = LOGO_SVG;
+    var link = document.createElement("link");
+    link.rel = "icon";
+    link.type = "image/svg+xml";
+    link.href = "data:image/svg+xml," + encodeURIComponent(svg);
+    document.head.appendChild(link);
+  }
+
   function build(){
+    addFavicon();
     var here = norm(location.pathname);
 
     var rail = document.createElement("aside");
@@ -53,7 +70,7 @@ var NAV = [
     brand.className = "shell-brand";
     brand.href = BASE;
     brand.innerHTML =
-      '<span class="shell-mark">S</span>' +
+      '<span class="shell-mark" style="background:none">' + LOGO_SVG.replace("<svg ", "<svg width='28' height='28' aria-hidden='true' ") + '</span>' +
       '<span><b>Sinshow</b><span>광고 운영 도구</span></span>';
     rail.appendChild(brand);
 
