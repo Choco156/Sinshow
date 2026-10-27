@@ -25,7 +25,7 @@ var NAV = [
   { path:"shopping-reorder/", label:"쇼핑검색 소재 변환", icon:"⇄",
     desc:"쇼검_소재 시트에서 디바이스·소재 ID 등 7개 열만 뽑아 값으로 저장합니다." },
   { path:"signup-report/", label:"회원가입 리포트 가공", icon:"◧",
-    desc:"SA·SS 일별 회원가입 CSV에 구분과 몰 상품id를 붙입니다." }
+    desc:"에어브릿지 회원가입·일간보고서를 취합해 AB_RAW용 데이터를 만듭니다." }
 ];
 
 (function(){
