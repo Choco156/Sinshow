@@ -128,6 +128,8 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
     <div class="actions" id="abCopy" style="display:none; margin-top:14px">
       <button class="btn" id="abCopy1">날짜~디바이스 복사 (AB_RAW C:F)</button>
       <button class="btn" id="abCopy2">노출~매출액 복사 (AB_RAW I:N)</button>
+      <button class="btn" id="abDlSa">SA 수정 파일 다운로드</button>
+      <button class="btn" id="abDlSs">SS 수정 파일 다운로드</button>
     </div>
     <div id="abTable"></div>
   </div>
@@ -370,7 +372,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
   });
 
   $("abReset").onclick = function(){
-    ab = { sa:null, ss:null, daily:null, xlsx:null, map:null, loading:false, out:null };
+    ab = { sa:null, ss:null, daily:null, xlsx:null, map:null, loading:false, out:null, saOut:null, ssOut:null };
     $("abDept").value = ""; $("abSuper").value = "";
     $("abDeptCount").textContent = "0개"; $("abSuperCount").textContent = "0개";
     $("abCopy").style.display = "none"; $("abTable").innerHTML = "";
@@ -402,7 +404,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
     if(!dept.size && !sup.size){
       if(!confirm("백화점·슈퍼브랜드 코드가 비어 있습니다.\n확인을 누르면 SS는 모두 구분 없이(ss_mo, ss_pc) 합쳐집니다.")) return;
     }
-    $("abCopy").style.display = "none"; $("abTable").innerHTML = "";
+    $("abCopy").style.display = "none"; $("abTable").innerHTML = ""; ab.saOut = null; ab.ssOut = null;
     say("abMsg", "load", "취합하는 중입니다.");
     await tick();
     try{
@@ -415,6 +417,12 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
       var agg = {};
       var saC = hIndex(saRows[0], "Content");
       abAggregate(saRows, function(r){ return saClass(r[saC]); }, agg, warn, "SA");
+      // SA 수정 파일 (SA 구분 탭과 같은 형식: A | B(Campaign+구분) | 빈 열 | 나머지)
+      ab.saOut = saRows.map(function(r, i){
+        var row = r.slice(); while(row.length < 3) row.push("");
+        if(i === 0) return [row[0], row[1], ""].concat(row.slice(2));
+        return [row[0], String(row[1]) + saClass(row[saC]), ""].concat(row.slice(2));
+      });
       var ssC = hIndex(ssRows[0], "Content"), ssCamp = hIndex(ssRows[0], "Campaign"), na = 0;
       abAggregate(ssRows, function(r){
         var key = String(r[ssC] == null ? "" : r[ssC]).trim();
@@ -424,6 +432,19 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
         if(dept.has(code)) return "백화점";
         return "-";
       }, agg, warn, "SS");
+      // SS 수정 파일 (SS 탭과 같은 형식: A | B(Campaign+구분) | 빈 열 | Content | 몰 상품id | 나머지)
+      ab.ssOut = ssRows.map(function(r, i){
+        var row = r.slice(); while(row.length < 3) row.push("");
+        if(i === 0) return [row[0], row[1], "", row[2], "몰 상품id"].concat(row.slice(3));
+        var key = String(row[2] == null ? "" : row[2]).trim();
+        var id = ab.map.has(key) ? ab.map.get(key) : "#N/A", g = "-";
+        if(id !== "#N/A"){
+          var code = normCode(id);
+          if(isMO(row[1]) && sup.has(code)) g = "슈퍼브랜드";
+          else if(dept.has(code)) g = "백화점";
+        }
+        return [row[0], String(row[1]) + g, "", row[2], id].concat(row.slice(3));
+      });
       if(na) warn.push("SS에서 소재상세에 없는 소재 ID " + fmtN(na) + "행은 구분 없이 합쳤습니다. 많다면 소재 엑셀이 최신인지 확인해 주세요.");
 
       // 2) 일간보고서 대체
@@ -489,7 +510,7 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
       }).join("\r\n") + "\r\n";
       download(csv, name);
 
-      var title = esc(name) + " 파일로 저장했습니다. 아래 복사 버튼으로 AB_RAW에 붙여넣을 수도 있습니다.";
+      var title = esc(name) + " 파일로 저장했습니다. 아래 복사 버튼으로 AB_RAW에 붙여넣을 수도 있고, SA·SS 수정 파일은 필요할 때 버튼으로 받으세요.";
       say("abMsg", warn.length ? "warn" : "ok", warn.length ? title + " 확인이 필요한 항목이 있습니다." : title, warn.concat(info));
       $("abCopy").style.display = "flex";
 
@@ -515,6 +536,8 @@ tr.sum td{font-weight:700; border-top:1px solid var(--line)}
     catch(e){ btn.textContent = "복사 실패"; }
     setTimeout(function(){ btn.textContent = label; }, 1600);
   }
+  $("abDlSa").onclick = function(){ if(ab.saOut) download(toCSV(ab.saOut), outName(ab.sa.name)); };
+  $("abDlSs").onclick = function(){ if(ab.ssOut) download(toCSV(ab.ssOut), outName(ab.ss.name)); };
   $("abCopy1").onclick = function(){ abCopy(this, 0, 4, "날짜~디바이스 복사 (AB_RAW C:F)"); };
   $("abCopy2").onclick = function(){ abCopy(this, 4, 10, "노출~매출액 복사 (AB_RAW I:N)"); };
 
