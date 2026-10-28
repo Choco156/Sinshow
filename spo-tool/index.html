@@ -7,6 +7,8 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' ry='7' fill='black'/><text x='16' y='23' font-family='Arial Black,sans-serif' font-size='20' font-weight='900' fill='%23FF1493' text-anchor='middle'>S</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="../assets/shell.css">
+<script src="../assets/config.js"></script>
+<script src="../assets/product-lists.js"></script>
 <script src="../assets/shell.js" defer></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
@@ -395,13 +397,17 @@
   }
   .cc-field textarea:focus{border-color:var(--accent)}
   .cc-count{font-size:12px; color:var(--muted); margin-top:5px}
-  .cc-split{display:none; align-items:center; gap:7px; font-size:13px; margin:0 0 8px; cursor:pointer; user-select:none}
-  .cc-split.on{display:flex}
-  .cc-split input{width:15px; height:15px; accent-color:var(--accent); margin:0}
-  .cc-days{display:none; flex-direction:column; gap:10px}
-  .cc-days.on{display:flex}
-  .cc-day b{display:block; font-size:12.5px; margin-bottom:4px}
-  .cc-day textarea{min-height:90px}
+  .cc-lstatus{font-size:13px; color:var(--muted); margin:0 0 10px}
+  .cc-lstatus.err{color:var(--warn)}
+  .cc-lines{display:grid; gap:7px}
+  .cc-lines .ln{background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:8px 11px; font-size:13.5px; line-height:1.6}
+  .cc-lines .ln b{font-variant-numeric:tabular-nums}
+  .cc-lines .ln .w{color:var(--warn); font-weight:700}
+  details.cc-manual{margin-top:14px; border-top:1px solid var(--line); padding-top:12px}
+  details.cc-manual summary{cursor:pointer; font-size:13.5px; font-weight:500; color:var(--muted)}
+  details.cc-manual summary:hover{color:var(--ink)}
+  details.cc-manual[open] summary{margin-bottom:12px; color:var(--ink)}
+  .cc-on{font-size:12px; font-weight:700; padding:1px 8px; border-radius:20px; background:var(--warn-soft); color:var(--warn); margin-left:6px}
   .cc-msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-top:14px}
   .cc-msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
   .cc-msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
@@ -522,7 +528,7 @@
   <section class="mpanel" id="m-class">
 
   <div class="cc-head">
-    <p>합본 파일을 올리고 상품코드를 붙여넣으면 매체 규칙에 따라 백화점·슈퍼브랜드를 구분해 드립니다.</p>
+    <p>합본 파일을 올리면 상품 목록 관리에 등록된 목록으로 매체 규칙에 따라 백화점·슈퍼브랜드를 구분해 드립니다.</p>
   </div>
 
   <div class="card">
@@ -536,32 +542,34 @@
   </div>
 
   <div class="card">
-    <div class="card-title">상품코드 붙여넣기</div>
-    <div class="cc-grid">
-      <div class="cc-field">
-        <label>백화점 (쇼핑검색 전용)
-          <span class="sub">쇼핑검색 MO·PC 에만 백화점으로 분류</span></label>
-        <textarea id="ccDeptShop" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
-        <div class="cc-count" id="ccCount1">0개</div>
-      </div>
-      <div class="cc-field">
-        <label>백화점 (쇼검 외)
-          <span class="sub">쇼핑검색·파워링크 MO·PC 에 백화점으로 분류</span></label>
-        <textarea id="ccDeptEtc" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
-        <div class="cc-count" id="ccCount2">0개</div>
-      </div>
-      <div class="cc-field">
-        <label>슈퍼브랜드
-          <span class="sub">쇼핑검색 MO · 파워링크 MO 에만 분류 (PC 제외)</span></label>
-        <label class="cc-split" id="ccSplitWrap"><input type="checkbox" id="ccSplit"> 날짜별로 따로 입력</label>
-        <div id="ccSuperOne">
+    <div class="card-title">적용 목록</div>
+    <div class="cc-lstatus" id="ccLStatus">목록을 불러오는 중입니다.</div>
+    <div class="cc-lines" id="ccLines"></div>
+    <details class="cc-manual" id="ccManual">
+      <summary>직접 붙여넣기<span class="cc-on" id="ccManualOn" hidden>사용 중</span></summary>
+      <div class="kw-hint" style="margin:0 0 12px">여기에 코드를 넣으면 저장된 목록 대신 이 코드를 모든 날짜에 똑같이 씁니다. 비워 두면 저장된 목록을 씁니다.</div>
+      <div class="cc-grid">
+        <div class="cc-field">
+          <label>백화점 (쇼핑검색 전용)
+            <span class="sub">쇼핑검색 MO·PC 에만 백화점으로 분류</span></label>
+          <textarea id="ccDeptShop" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+          <div class="cc-count" id="ccCount1">0개</div>
+        </div>
+        <div class="cc-field">
+          <label>백화점 (쇼검 외)
+            <span class="sub">쇼핑검색·파워링크 MO·PC 에 백화점으로 분류</span></label>
+          <textarea id="ccDeptEtc" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
+          <div class="cc-count" id="ccCount2">0개</div>
+        </div>
+        <div class="cc-field">
+          <label>슈퍼브랜드
+            <span class="sub">쇼핑검색 MO · 파워링크 MO 에만 분류 (PC 제외)</span></label>
           <textarea id="ccSuper" placeholder="엑셀에서 세로로 복사해 붙여넣으세요"></textarea>
           <div class="cc-count" id="ccCount3">0개</div>
         </div>
-        <div class="cc-days" id="ccDays"></div>
       </div>
-    </div>
-    <div class="kw-hint">💡 백화점 두 칸 사이에는 같은 코드가 있어도 됩니다. 슈퍼브랜드와 겹칠 때만 멈춥니다.</div>
+    </details>
+    <div class="kw-hint">💡 백화점과 슈퍼브랜드에 같은 코드가 있으면 MO는 슈퍼브랜드, PC는 백화점으로 분류하고 아래에 알려 드립니다.</div>
     <div id="ccMsg"></div>
   </div>
 
@@ -916,7 +924,11 @@ renderKeywords();
   var t1 = el("ccDeptShop"), t2 = el("ccDeptEtc"), t3 = el("ccSuper");
   var runBtn = el("ccRun"), msgBox = el("ccMsg"), resultBox = el("ccResult");
 
-  var SHEET = null, FILENAME = "", DATES = [];
+  var SHEET = null, FILENAME = "", FD = null;   // FD: 파일 날짜 정보
+  var L = { rows: [], source: "loading", error: null, savedAt: null };   // 상품 목록
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function md(iso){ return Number(iso.slice(5, 7)) + "/" + Number(iso.slice(8, 10)); }
 
   /* 붙여넣은 글에서 숫자 코드만 뽑아냅니다 (줄바꿈·쉼표·공백 아무거나) */
   function parseCodes(text){
@@ -935,36 +947,92 @@ renderKeywords();
       el(pair[1]).textContent = p.list.length + "개" +
         (p.dupInside ? " (같은 칸 중복 " + p.dupInside + "개 정리됨)" : "");
     });
+    renderLists();
   }
   [t1,t2,t3].forEach(function(t){ t.addEventListener("input", refreshCounts); });
 
-  /* 슈퍼브랜드 날짜별 입력 */
-  var splitWrap = el("ccSplitWrap"), splitCk = el("ccSplit");
-  var oneBox = el("ccSuperOne"), daysBox = el("ccDays");
-
-  function setSplit(on){
-    oneBox.style.display = on ? "none" : "";
-    daysBox.classList.toggle("on", on);
-    if(!on){ daysBox.innerHTML = ""; return; }
-    daysBox.innerHTML = "";
-    DATES.forEach(function(d){
-      var w = document.createElement("div");
-      w.className = "cc-day";
-      var b = document.createElement("b");
-      b.textContent = d;
-      var ta = document.createElement("textarea");
-      ta.dataset.date = d;
-      ta.value = t3.value;                    // 하나로 넣어둔 코드를 미리 복사
-      var cnt = document.createElement("div");
-      cnt.className = "cc-count";
-      var upd = function(){ cnt.textContent = parseCodes(ta.value).list.length + "개"; };
-      ta.addEventListener("input", upd);
-      upd();
-      w.appendChild(b); w.appendChild(ta); w.appendChild(cnt);
-      daysBox.appendChild(w);
-    });
+  /* 날짜 읽기: 2026/10/27, 2026-10-27, 20261027, 엑셀 날짜 모두 → 2026-10-27 */
+  function normDate(v){
+    if(typeof v === "number" && v > 30000 && v < 80000) return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
+    var s = String(v == null ? "" : v).trim(), m;
+    if((m = s.match(/^(\d{4})(\d{2})(\d{2})$/))) return m[1] + "-" + m[2] + "-" + m[3];
+    if((m = s.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/))) return m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0");
+    return "";
   }
-  splitCk.addEventListener("change", function(){ setSplit(splitCk.checked); });
+  function daysBetween(a, b){ return Math.round((new Date(b + "T00:00:00Z") - new Date(a + "T00:00:00Z")) / 86400000) + 1; }
+
+  /* 파일의 날짜 정보
+     col    : 일자별 열이 있음 → 행마다 그 날짜
+     period : 일자별 열 없음, 2행 기간이 하루 → 그 날짜
+     multi  : 일자별 열 없음, 기간이 2일 이상 → 분류하지 않음
+     none   : 날짜를 찾지 못함 */
+  function fileDates(sheet, head){
+    if(head.date >= 0){
+      var seen = {}, bad = 0;
+      for(var i = head.row + 1; i < sheet.length; i++){
+        var r = sheet[i] || [];
+        if(!String(r[head.code] == null ? "" : r[head.code]).trim()) continue;
+        var d = normDate(r[head.date]);
+        if(d) seen[d] = true; else bad++;
+      }
+      return { mode: "col", dates: Object.keys(seen).sort(), bad: bad };
+    }
+    var text = sheet.slice(0, head.row).map(function(r){ return (r || []).join(" "); }).join(" ");
+    var m = text.match(/기간\s*:\s*(\d{4}[\/.\-]\d{1,2}[\/.\-]\d{1,2})\s*~\s*(\d{4}[\/.\-]\d{1,2}[\/.\-]\d{1,2})/);
+    if(!m) return { mode: "none", dates: [] };
+    var from = normDate(m[1]), to = normDate(m[2]);
+    if(from === to) return { mode: "period", dates: [from] };
+    return { mode: "multi", dates: [], from: from, to: to, n: daysBetween(from, to) };
+  }
+
+  /* 직접 붙여넣기에 뭔가 있으면 그걸 씁니다 */
+  function manual(){
+    var p1 = parseCodes(t1.value), p2 = parseCodes(t2.value), p3 = parseCodes(t3.value);
+    if(!p1.list.length && !p2.list.length && !p3.list.length) return null;
+    return { A: new Set(p1.list), B: new Set(p2.list), C: new Set(p3.list) };
+  }
+  /* 날짜별 목록: ① 백화점(쇼검)=A, ② 백화점(파워링크)=B, ③ 슈퍼브랜드=C */
+  function listsFor(date){
+    var m = manual();
+    if(m) return m;
+    var a = SinshowLists.deptFor(L.rows, "dept_shop", date), b = SinshowLists.deptFor(L.rows, "dept_power", date), c = SinshowLists.superFor(L.rows, date);
+    return { A: a ? a.codes : new Set(), B: b ? b.codes : new Set(), C: c.codes, a: a, b: b, brands: c.brands };
+  }
+
+  function renderLists(){
+    var st = el("ccLStatus"), box = el("ccLines"), m = manual();
+    el("ccManualOn").hidden = !m;
+    if(L.source === "loading"){ st.textContent = "목록을 불러오는 중입니다."; st.className = "cc-lstatus"; }
+    else if(L.source === "live"){ st.textContent = "상품 목록 관리에서 목록 " + L.rows.length + "건을 불러왔습니다."; st.className = "cc-lstatus"; }
+    else if(L.source === "cache"){ st.textContent = "Supabase에 연결하지 못해(" + (L.error || "") + ") " + String(L.savedAt || "").slice(0, 16).replace("T", " ") + "에 받아둔 목록으로 계산합니다."; st.className = "cc-lstatus err"; }
+    else{ st.textContent = "목록을 불러오지 못했습니다(" + (L.error || "") + "). 분류하려면 아래 직접 붙여넣기에 코드를 넣어 주세요."; st.className = "cc-lstatus err"; }
+
+    if(FD && FD.mode === "multi"){
+      box.innerHTML = "<div class='ln'><span class='w'>기간 " + md(FD.from) + " ~ " + md(FD.to) + " (" + FD.n + "일) 파일인데 일자별 열이 없습니다. 날짜마다 목록이 다를 수 있어 분류하지 않습니다. 일자별로 받아서 올려 주세요.</span></div>";
+      return;
+    }
+    if(m){
+      box.innerHTML = "<div class='ln'>직접 붙여넣은 코드를 모든 날짜에 씁니다 · 백화점(쇼검) <b>" + m.A.size + "개</b> · 백화점(쇼검 외) <b>" + m.B.size + "개</b> · 슈퍼브랜드 <b>" + m.C.size + "개</b></div>";
+      return;
+    }
+    if(!FD){ box.innerHTML = "<div class='ln' style='color:var(--muted)'>합본 파일을 올리면 날짜별로 어떤 목록을 쓰는지 보여줍니다.</div>"; return; }
+    if(FD.mode === "none"){ box.innerHTML = "<div class='ln'><span class='w'>파일에서 날짜(일자별 열이나 2행 기간)를 찾지 못했습니다. 일자별로 받은 파일을 올리거나 직접 붙여넣기를 써 주세요.</span></div>"; return; }
+    if(L.source === "loading" || L.source === "none"){ box.innerHTML = ""; return; }
+    var groups = [];
+    FD.dates.forEach(function(d){
+      var c = listsFor(d);
+      var sig = (c.a ? c.a.id : "x") + "|" + (c.b ? c.b.id : "x") + "|" + JSON.stringify(c.brands);
+      var last = groups[groups.length - 1];
+      if(last && last.sig === sig) last.to = d; else groups.push({ sig: sig, from: d, to: d, c: c });
+    });
+    box.innerHTML = groups.map(function(g){
+      var c = g.c, br = Object.keys(c.brands);
+      var a = c.a ? "① 백화점(쇼검) " + md(c.a.start) + " 버전 <b>" + c.a.count.toLocaleString("ko-KR") + "개</b>" : "<span class='w'>① 백화점(쇼검) 목록 없음</span>";
+      var b = c.b ? "② 백화점(쇼검 외) " + md(c.b.start) + " 버전 <b>" + c.b.count.toLocaleString("ko-KR") + "개</b>" : "<span class='w'>② 백화점(쇼검 외) 목록 없음</span>";
+      var sp = br.length ? "③ 슈퍼브랜드 " + br.map(function(x){ return esc(x) + " <b>" + c.brands[x] + "</b>"; }).join(" · ") : "③ 슈퍼브랜드 없음";
+      return "<div class='ln'><b>" + md(g.from) + (g.to !== g.from ? " ~ " + md(g.to) : "") + "</b> · " + a + " · " + b + " · " + sp + "</div>";
+    }).join("");
+  }
 
   /* 파일 읽기 */
   fileEl.addEventListener("change", function(e){
@@ -979,29 +1047,23 @@ renderKeywords();
         SHEET = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
         var head = findHeader(SHEET);
         if(!head){
-          SHEET = null;
+          SHEET = null; FD = null;
           infoEl.textContent = "‘상품코드’ 열을 찾지 못했습니다. 합본 파일이 맞는지 확인해 주세요.";
-          runBtn.disabled = true;
+          runBtn.disabled = true; renderLists();
           return;
         }
-        DATES = [];
-        if(head.date >= 0){
-          var seen = {};
-          for(var i = head.row + 1; i < SHEET.length; i++){
-            var d = String((SHEET[i] || [])[head.date] || "").trim();
-            if(d && !seen[d]){ seen[d] = true; DATES.push(d); }
-          }
-          DATES.sort();
-        }
-        infoEl.textContent = f.name + " · 데이터 " + (SHEET.length - head.row - 1) + "행" +
-          (DATES.length > 1 ? " · " + DATES[0] + " ~ " + DATES[DATES.length - 1] + " (" + DATES.length + "일)" : "");
-        splitCk.checked = false;
-        setSplit(false);
-        splitWrap.classList.toggle("on", DATES.length > 1);
+        FD = fileDates(SHEET, head);
+        var dtxt = FD.mode === "col" ? (FD.dates.length ? " · 일자별 " + md(FD.dates[0]) + (FD.dates.length > 1 ? " ~ " + md(FD.dates[FD.dates.length - 1]) + " (" + FD.dates.length + "일)" : "") : "")
+                 : FD.mode === "period" ? " · 기간 " + md(FD.dates[0])
+                 : FD.mode === "multi" ? " · 기간 " + md(FD.from) + " ~ " + md(FD.to) + " (일자별 열 없음)" : " · 날짜 없음";
+        infoEl.textContent = f.name + " · 데이터 " + (SHEET.length - head.row - 1) + "행" + dtxt;
+        msgBox.innerHTML = ""; resultBox.innerHTML = "";
         runBtn.disabled = false;
+        renderLists();
       }catch(err){
-        SHEET = null; runBtn.disabled = true;
+        SHEET = null; FD = null; runBtn.disabled = true;
         infoEl.textContent = "파일을 읽지 못했습니다: " + err.message;
+        renderLists();
       }
     };
     fr.readAsArrayBuffer(f);
@@ -1035,57 +1097,31 @@ renderKeywords();
     box.appendChild(d);
   }
 
-  /* 매체 + 코드 → 구분 */
-  function decide(media, code, A, B, C){
+  /* 매체 + 코드 → 구분 (MO면 슈퍼브랜드 우선, 그 밖에 백화점) */
+  function decide(media, code, X){
     var shop  = media.indexOf("쇼핑검색") >= 0;
     var power = media.indexOf("파워링크") >= 0;
     var mo    = /MO$/.test(media.replace(/\s+/g, ""));
-    if(shop && A[code]) return "백화점";
-    if((shop || power) && B[code]) return "백화점";
-    if(mo && (shop || power) && C[code]) return "슈퍼브랜드";
+    if(mo && (shop || power) && X.C.has(code)) return "슈퍼브랜드";
+    if(shop && X.A.has(code)) return "백화점";
+    if((shop || power) && X.B.has(code)) return "백화점";
     return "-";
   }
 
   runBtn.onclick = function(){
     msgBox.innerHTML = ""; resultBox.innerHTML = "";
     if(!SHEET) return;
+    var m = manual();
 
-    var p1 = parseCodes(t1.value), p2 = parseCodes(t2.value), p3 = parseCodes(t3.value);
-
-    /* 슈퍼브랜드: 날짜별로 나눴으면 날짜마다, 아니면 하나로 전체 적용 */
-    var split = splitCk.checked && DATES.length > 1;
-    var superByDate = {}, superGroups = [];
-    if(split){
-      daysBox.querySelectorAll("textarea").forEach(function(ta){
-        var p = parseCodes(ta.value);
-        superByDate[ta.dataset.date] = p;
-        superGroups.push({ label: "슈퍼브랜드 " + ta.dataset.date, p: p });
-      });
-    } else {
-      superGroups.push({ label: "슈퍼브랜드", p: p3 });
-    }
-
-    /* 슈퍼브랜드와 백화점이 겹치면 멈춥니다 (백화점 두 칸끼리는 겹쳐도 됩니다) */
-    var clash = [];
-    superGroups.forEach(function(g){
-      [[p1,"백화점(쇼검)"],[p2,"백화점(쇼검 외)"]].forEach(function(d){
-        d[0].list.forEach(function(c){
-          if(g.p.set[c]) clash.push(c + " — " + d[1] + " / " + g.label);
-        });
-      });
-    });
-    if(clash.length){
-      alert("수기 확인이 필요합니다.");
-      show(msgBox, "warn", "아래 상품코드가 여러 칸에 동시에 들어 있어 분류를 멈췄습니다.", clash);
+    if(FD && FD.mode === "multi"){
+      show(msgBox, "warn", "기간 " + FD.from + " ~ " + FD.to + " (" + FD.n + "일) 파일인데 일자별 열이 없어 분류하지 않았습니다. 일자별로 받아서 올려 주세요.", []);
       return;
     }
-
-    if(split){
-      var empty = DATES.filter(function(d){ return !superByDate[d] || !superByDate[d].list.length; });
-      if(empty.length){
-        var ok = confirm(empty.join(", ") + " 슈퍼브랜드 칸이 비어 있습니다.\n확인을 누르면 해당 날짜는 슈퍼브랜드 없이 진행합니다.");
-        if(!ok) return;
-      }
+    if(!m){
+      if(L.source === "loading"){ show(msgBox, "warn", "상품 목록을 아직 불러오는 중입니다. 잠시 후 다시 눌러 주세요.", []); return; }
+      if(L.source === "none"){ show(msgBox, "warn", "상품 목록을 불러오지 못했습니다. ‘직접 붙여넣기’에 코드를 넣어 주세요.", []); return; }
+      if(FD.mode === "none"){ show(msgBox, "warn", "파일에서 날짜를 찾지 못했습니다. 일자별로 받은 파일을 올리거나 ‘직접 붙여넣기’를 써 주세요.", []); return; }
+      if(FD.mode === "col" && FD.bad){ show(msgBox, "warn", "일자별 값을 날짜로 읽지 못한 행이 " + FD.bad + "개 있어 분류하지 않았습니다. 파일을 확인해 주세요.", []); return; }
     }
 
     var head = findHeader(SHEET);
@@ -1095,8 +1131,15 @@ renderKeywords();
       return;
     }
 
+    var cache = {};
+    function listsOf(row){
+      var d = m ? "manual" : (FD.mode === "col" ? normDate(row[di]) : FD.dates[0]);
+      if(!cache[d]) cache[d] = listsFor(d);
+      return cache[d];
+    }
+
     /* 분류 */
-    var out = [], tally = {}, counts = {"백화점":0, "슈퍼브랜드":0, "-":0}, noRaw = [];
+    var out = [], tally = {}, counts = {"백화점":0, "슈퍼브랜드":0, "-":0}, noRaw = [], overlap = {};
     SHEET.forEach(function(row, i){
       var r = (row || []).slice();
       if(i < head.row){ out.push(r); return; }            // 제목·기간 줄은 그대로
@@ -1107,12 +1150,9 @@ renderKeywords();
       var code = String(r[ci] == null ? "" : r[ci]).trim();
       if(!code){ out.push(r); return; }
       var media = String(r[mi] == null ? "" : r[mi]).trim();
-      var superSet = p3.set;
-      if(split){
-        var rd = String(r[di] == null ? "" : r[di]).trim();
-        superSet = superByDate[rd] ? superByDate[rd].set : {};
-      }
-      var mark = decide(media, code, p1.set, p2.set, superSet);
+      var X = listsOf(r);
+      if(X.C.has(code) && (X.A.has(code) || X.B.has(code))) overlap[code] = true;
+      var mark = decide(media, code, X);
       var spo = media + mark;
       var raw = RAWMAP[spo];
       if(raw === undefined){ raw = "#N/A"; if(noRaw.indexOf(spo) < 0) noRaw.push(spo); }
@@ -1122,6 +1162,17 @@ renderKeywords();
       r.splice(ci + 1, 0, mark, spo, raw);
       out.push(r);
     });
+
+    /* 알림 */
+    if(!m){
+      var noList = Object.keys(cache).filter(function(d){ return !cache[d].a || !cache[d].b; });
+      if(noList.length) show(msgBox, "warn", "백화점 목록이 없는 날짜가 있어 그날은 해당 백화점 구분이 모두 “-”로 들어갔습니다. 상품 목록 관리에서 확인해 주세요.", noList.map(function(d){
+        return d + " · " + [!cache[d].a ? "① 백화점(쇼검)" : "", !cache[d].b ? "② 백화점(쇼검 외)" : ""].filter(Boolean).join(", ") + " 없음";
+      }));
+      if(L.source === "cache") show(msgBox, "warn", "Supabase에 연결하지 못해 마지막으로 받아둔 목록으로 분류했습니다.", []);
+    }
+    var ov = Object.keys(overlap);
+    if(ov.length) show(msgBox, "warn", "백화점과 슈퍼브랜드에 모두 있는 상품 " + ov.length + "개가 있습니다. MO는 슈퍼브랜드, PC는 백화점으로 분류했습니다.", ov);
 
     /* 화면 결과 */
     var card = document.createElement("div");
@@ -1179,14 +1230,17 @@ renderKeywords();
   })();
 
   el("ccReset").onclick = function(){
-    SHEET = null; FILENAME = "";
+    SHEET = null; FILENAME = ""; FD = null;
     fileEl.value = ""; t1.value = ""; t2.value = ""; t3.value = "";
     infoEl.textContent = "아직 파일이 없어요 👆";
-    DATES = []; splitCk.checked = false; setSplit(false); splitWrap.classList.remove("on");
     msgBox.innerHTML = ""; resultBox.innerHTML = "";
     runBtn.disabled = true;
     refreshCounts();
   };
+
+  /* 상품 목록 불러오기 */
+  renderLists();
+  SinshowLists.load().then(function(r){ L = r; renderLists(); });
 })();
 </script>
 </body>
