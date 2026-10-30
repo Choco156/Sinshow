@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쇼검 RAW 만들기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/shell.css">
+<script src="../assets/shell.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow)}
+.card h2{font-size:15px; font-weight:700; margin:0 0 4px}
+.card p.hint{color:var(--muted); font-size:13px; margin:0 0 14px}
+.drop{border:1.5px dashed var(--line); border-radius:10px; background:var(--surface2); padding:26px 20px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s}
+.drop:hover,.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.drop strong{display:block; font-size:15px; margin-bottom:3px}
+.drop span{color:var(--muted); font-size:13px}
+.filelist{list-style:none; margin:12px 0 0; padding:0; display:grid; gap:7px}
+.filelist li{display:flex; align-items:center; gap:10px; font-size:13.5px; background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:8px 11px}
+.badge{font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--accent-soft); color:var(--accent); white-space:nowrap; min-width:74px; text-align:center}
+.badge.wait{background:var(--surface); color:var(--muted); border:1px solid var(--line)}
+.badge.bad{background:var(--warn-soft); color:var(--warn)}
+.fname{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted)}
+.rows{font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.btn{appearance:none; font:inherit; font-weight:500; cursor:pointer; border-radius:7px; padding:9px 16px; border:1px solid var(--line); background:var(--surface); color:var(--ink)}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.small{padding:4px 10px; font-size:12.5px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.actions{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-top:14px}
+.msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
+.msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
+.msg.load{background:var(--surface2); color:var(--muted); border:1px solid var(--line)}
+.msg ul{margin:6px 0 0; padding-left:18px}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:9px; background:var(--surface); margin-top:14px}
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+th,td{padding:7px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
+th{background:var(--surface2); font-weight:700; font-size:12.5px; color:var(--muted)}
+td.n,th.n{text-align:right; font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+@media (max-width:620px){ .home-head h1{font-size:20px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="home-head">
+  <h1>쇼검 RAW 만들기</h1>
+  <span class="sub">쇼핑검색 효율관리 파일의 RAW 시트 4개에 붙일 데이터를 한 번에 만듭니다</span>
+</header>
+
+<div class="card">
+  <h2>파일 올리기</h2>
+  <p class="hint">아래 6개 파일을 한꺼번에 끌어다 놓으세요. 파일 내용과 이름을 보고 알아서 구분합니다. SPO는 내용으로 PC·MO를 알 수 없어서 이름으로 구분합니다 (그냥 파일 = PC, “(1)”이 붙은 파일 = MO).</p>
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="파일 올리기">
+    <strong>파일을 끌어다 놓거나 눌러서 선택</strong>
+    <span>매체 CSV 2개 · SPO xls 2개 · 에어브릿지 SS 회원가입 CSV · 쇼핑검색 소재 xlsx · 소재 엑셀은 읽는 데 수십 초 걸릴 수 있습니다</span>
+  </div>
+  <input type="file" id="input" accept=".csv,.xls,.xlsx,.xml" multiple hidden>
+  <ul class="filelist" id="list"></ul>
+  <div id="fmsg"></div>
+</div>
+
+<div class="card">
+  <div class="actions">
+    <button class="btn primary" id="run" disabled>붙여넣기용 파일 만들기</button>
+    <button class="btn" id="reset">초기화</button>
+  </div>
+  <div id="msg"></div>
+  <div id="table"></div>
+</div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function fmtN(n){ return Math.round(n).toLocaleString("ko-KR"); }
+  function tick(){ return new Promise(function(r){ setTimeout(r, 30); }); }
+  function say(id, kind, title, items){
+    if(!kind){ $(id).innerHTML = ""; return; }
+    var h = '<div class="msg ' + kind + '">' + title;
+    if(items && items.length) h += "<ul><li>" + items.join("</li><li>") + "</li></ul>";
+    $(id).innerHTML = h + "</div>";
+  }
+
+  // 숫자처럼 생긴 글자는 숫자로 (쉼표 제거). 아니면 그대로
+  function num(v){
+    if(typeof v === "number") return v;
+    var s = String(v == null ? "" : v).trim();
+    if(/^-?[\d,]+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g, ""));
+    return s;
+  }
+  function toNum0(v){ var n = num(v); return typeof n === "number" ? n : 0; }
+
+  async function readText(file){
+    var buf = await file.arrayBuffer();
+    try{ return new TextDecoder("utf-8", {fatal:true}).decode(buf).replace(/^\uFEFF/, ""); }
+    catch(e){ return new TextDecoder("euc-kr").decode(buf).replace(/^\uFEFF/, ""); }
+  }
+  function parseCSV(text){
+    var rows = [], row = [], f = "", q = false, i = 0, c;
+    for(; i < text.length; i++){
+      c = text[i];
+      if(q){
+        if(c === '"'){ if(text[i+1] === '"'){ f += '"'; i++; } else q = false; }
+        else f += c;
+      }else if(c === '"') q = true;
+      else if(c === ","){ row.push(f); f = ""; }
+      else if(c === "\n" || c === "\r"){
+        if(c === "\r" && text[i+1] === "\n") i++;
+        row.push(f); rows.push(row); row = []; f = "";
+      }else f += c;
+    }
+    if(f !== "" || row.length){ row.push(f); rows.push(row); }
+    return rows;
+  }
+  function dotDate(s){ var m = String(s).match(/(\d{4})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; }
+
+  /* ── 상태 ── */
+  function empty(){ return { media:{PC:null, MO:null}, spo:{PC:null, MO:null}, ab:null, ep:null, loadingEp:false }; }
+  var S = empty();
+  // 각 항목: { file, rows(붙일 데이터), date, info }
+
+  /* ── 파일별 읽기 ── */
+  async function readMedia(file, text){
+    var rows = parseCSV(text);
+    var date = dotDate(rows[0] && rows[0][0]);
+    var head = rows[1] || [];
+    if(String(head[0]).trim() !== "캠페인유형") throw new Error(file.name + ": 2행 헤더(캠페인유형…)를 찾지 못했습니다.");
+    var out = [], pc = 0, mo = 0;
+    for(var i = 2; i < rows.length; i++){
+      var r = rows[i]; if(r.length < 6) continue;
+      if(String(r[0]).trim() !== "쇼핑검색") continue;      // 파워링크 제외
+      out.push([r[0], r[1], r[2], num(r[3]), num(r[4]), num(r[5])]);
+      if(/_PC/i.test(r[1])) pc++; else if(/_MO/i.test(r[1])) mo++;
+    }
+    var dev = pc > mo ? "PC" : mo > pc ? "MO" : "";
+    if(!dev) throw new Error(file.name + ": 캠페인 이름으로 PC·MO를 알 수 없습니다.");
+    return { dev:dev, item:{ file:file, rows:out, date:date } };
+  }
+
+  function readAb(file, text){
+    var rows = parseCSV(text);
+    var h = rows[0];
+    var out = [];
+    for(var i = 1; i < rows.length; i++){
+      var r = rows[i]; if(r.length < 2) continue;
+      out.push(r.map(function(v, k){ return k < 3 ? v : num(v); }));   // Channel·Campaign·Content는 글자 그대로
+    }
+    var m = file.name.match(/(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/);
+    return { file:file, rows:out, date: m && m[1] === m[2] ? m[1] : "", range: m ? m[1] + " ~ " + m[2] : "", head:h };
+  }
+
+  async function readSpo(file){
+    var wb = XLSX.read(await file.arrayBuffer(), { type:"array" });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:"" });
+    var hr = -1;
+    for(var i = 0; i < Math.min(rows.length, 10); i++){ if(String(rows[i][0]).trim() === "No" && rows[i].indexOf("상품코드") >= 0){ hr = i; break; } }
+    if(hr < 0) throw new Error(file.name + ": No·상품코드 헤더를 찾지 못했습니다.");
+    var top = rows.slice(0, hr).map(function(r){ return r.join(" "); }).join(" ");
+    var pm = top.match(/기간\s*:\s*(\d{4}[\/.\-]\d{1,2}[\/.\-]\d{1,2})\s*~\s*(\d{4}[\/.\-]\d{1,2}[\/.\-]\d{1,2})/);
+    var out = [];
+    for(var j = hr + 1; j < rows.length; j++){
+      var r = rows[j];
+      if(!r || !String(r[3] == null ? "" : r[3]).trim()) continue;   // 상품코드 없는 줄(합계 등) 제외
+      // No 칸은 나중에 PC/MO로 바꿈. 분류명·상품명·상품코드는 글자, 예상취급액부터 숫자
+      out.push(r.map(function(v, k){ return k <= 3 ? String(v) : num(v); }));
+    }
+    var from = pm ? dotDate(pm[1]) : "", to = pm ? dotDate(pm[2]) : "";
+    return { file:file, rows:out, date: from && from === to ? from : "", range: pm ? from + " ~ " + to : "" };
+  }
+
+  // 쇼핑검색 소재 → EP_RAW 7개 열 (쇼핑검색 소재 변환과 같은 규칙) + 소재 ID 빈 행 삭제
+  async function readEp(file){
+    var wb = XLSX.read(await file.arrayBuffer(), { type:"array", sheets:0, cellFormula:false, cellHTML:false, cellStyles:false });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, blankrows:false });
+    var norm = function(v){ return String(v == null ? "" : v).replace(/\s+/g, ""); };
+    var out = [], dropped = 0, conv = false;
+    // 이미 변환된 파일(1행: 디바이스, 소재 ID …)도 받기
+    if(norm(rows[0] && rows[0][0]) === "디바이스" && norm(rows[0][1]) === "소재ID"){
+      conv = true;
+      for(var i = 1; i < rows.length; i++){
+        var r = rows[i] || [];
+        if(!String(r[1] == null ? "" : r[1]).trim()){ dropped++; continue; }
+        var x = r.slice(0, 7); while(x.length < 7) x.push(null);
+        if(x[3] == null || String(x[3]).trim() === "") x[3] = x[2];
+        out.push(x);
+      }
+    }else{
+      var hdr = -1;
+      for(var k = 0; k < Math.min(rows.length, 10); k++){ if(norm(rows[k] && rows[k][1]) === "디바이스"){ hdr = k; break; } }
+      if(hdr < 0) throw new Error(file.name + ": 쇼핑검색 소재 파일의 헤더(B열 디바이스)를 찾지 못했습니다.");
+      var ORDER = [1, 10, 11, 12, 13, 14, 2];   // B, K, L, M, N, O, C
+      for(var j = hdr + 1; j < rows.length; j++){
+        var rr = rows[j] || [];
+        if(!String(rr[10] == null ? "" : rr[10]).trim()){ dropped++; continue; }
+        var y = ORDER.map(function(c){ return rr[c] === undefined ? null : rr[c]; });
+        if(y[3] == null || String(y[3]).trim() === "") y[3] = y[2];
+        out.push(y);
+      }
+    }
+    return { file:file, rows:out, dropped:dropped, conv:conv };
+  }
+
+  /* ── 파일 구분 ── */
+  function li(cls, badge, name, right, extra){
+    return '<li><span class="badge ' + cls + '">' + esc(badge) + '</span><span class="fname">' + esc(name) + '</span><span class="rows">' + esc(right || "") + '</span>' + (extra || "") + "</li>";
+  }
+  function render(){
+    var h = "";
+    ["PC","MO"].forEach(function(d){ var x = S.media[d]; h += x ? li("", "매체 " + d, x.file.name, fmtN(x.rows.length) + "행") : li("wait", "매체 " + d, "아직 없음", ""); });
+    ["PC","MO"].forEach(function(d){
+      var x = S.spo[d];
+      h += x ? li("", "SPO " + d, x.file.name, fmtN(x.rows.length) + "행", d === "MO" ? ' <button class="btn small" id="swap">PC·MO 바꾸기</button>' : "") : li("wait", "SPO " + d, "아직 없음", "");
+    });
+    h += S.ab ? li("", "에어브릿지", S.ab.file.name, fmtN(S.ab.rows.length) + "행") : li("wait", "에어브릿지", "아직 없음", "");
+    if(S.loadingEp) h += li("wait", "읽는 중", S.loadingEp.name, "");
+    else h += S.ep ? li("", "소재 → EP", S.ep.file.name, fmtN(S.ep.rows.length) + "행" + (S.ep.dropped ? " (소재 ID 빈 행 " + fmtN(S.ep.dropped) + "개 삭제)" : "")) : li("wait", "소재 → EP", "아직 없음", "");
+    $("list").innerHTML = h;
+    if($("swap")) $("swap").onclick = function(){ var t = S.spo.PC; S.spo.PC = S.spo.MO; S.spo.MO = t; render(); };
+    $("run").disabled = !(S.media.PC && S.media.MO && S.spo.PC && S.spo.MO && S.ab && S.ep && !S.loadingEp);
+  }
+  render();
+
+  async function onFiles(files){
+    say("fmsg"); say("msg"); $("table").innerHTML = "";
+    var errs = [], epFile = null;
+    for(var i = 0; i < files.length; i++){
+      var f = files[i];
+      try{
+        if(/\.xlsx$/i.test(f.name)){ epFile = f; continue; }
+        if(/\.(xls|xml)$/i.test(f.name)){
+          if(typeof XLSX === "undefined") throw new Error("엑셀 처리 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.");
+          var sp = await readSpo(f);
+          var isMO = /\(\s*1\s*\)|_1_|__1_/.test(f.name);
+          S.spo[isMO ? "MO" : "PC"] = sp;
+          continue;
+        }
+        var text = await readText(f);
+        var first = text.split(/\r?\n/)[0];
+        if(/쇼핑검색_상품_데일리/.test(first)){ var md = await readMedia(f, text); S.media[md.dev] = md.item; continue; }
+        if(/^"?Channel"?,/.test(first) && /Content/.test(first)){ S.ab = readAb(f, text); continue; }
+        errs.push(esc(f.name) + ": 어떤 파일인지 알 수 없어 건너뛰었습니다.");
+      }catch(e){ console.error(e); errs.push(esc(e && e.message ? e.message : e)); }
+    }
+    render();
+    if(errs.length) say("fmsg", "warn", "확인이 필요한 파일이 있습니다.", errs);
+    if(epFile){
+      S.loadingEp = epFile; S.ep = null; render();
+      say("fmsg", "load", "소재 엑셀을 읽는 중입니다. 용량이 크면 수십 초 걸릴 수 있습니다.");
+      await tick();
+      try{
+        if(typeof XLSX === "undefined") throw new Error("엑셀 처리 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.");
+        S.ep = await readEp(epFile);
+        say("fmsg");
+      }catch(e){ console.error(e); say("fmsg", "warn", "소재 엑셀을 읽지 못했습니다: " + esc(e && e.message ? e.message : e)); }
+      S.loadingEp = false; render();
+    }
+  }
+
+  var drop = $("drop"), input = $("input");
+  drop.addEventListener("click", function(){ input.click(); });
+  drop.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); } });
+  ["dragenter","dragover"].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave","drop"].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function(e){ onFiles(Array.from(e.dataTransfer.files)); });
+  input.addEventListener("change", function(){ var fs = Array.from(input.files); input.value = ""; onFiles(fs); });
+
+  $("reset").onclick = function(){ S = empty(); render(); say("fmsg"); say("msg"); $("table").innerHTML = ""; };
+
+  /* ── 만들기 ── */
+  $("run").onclick = function(){
+    var warn = [];
+    // 날짜 확인
+    var dates = {};
+    ["PC","MO"].forEach(function(d){ if(S.media[d].date) dates["매체 " + d] = S.media[d].date; });
+    ["PC","MO"].forEach(function(d){ dates["SPO " + d] = S.spo[d].date || ("기간 " + (S.spo[d].range || "알 수 없음")); });
+    dates["에어브릿지"] = S.ab.date || ("기간 " + (S.ab.range || "알 수 없음"));
+    var vals = Object.keys(dates).map(function(k){ return dates[k]; });
+    var same = vals.every(function(v){ return v === vals[0]; });
+    if(!same) warn.push("파일 날짜가 서로 다릅니다: " + Object.keys(dates).map(function(k){ return esc(k) + " " + esc(dates[k]); }).join(", "));
+    if(S.ab.head && S.ab.head.length !== 20) warn.push("에어브릿지 파일 열이 " + S.ab.head.length + "개입니다 (보통 20개). 에어브릿지_RAW E~X열과 맞는지 확인해 주세요.");
+
+    var media = S.media.PC.rows.concat(S.media.MO.rows);
+    var spo = [];
+    ["PC","MO"].forEach(function(d){ S.spo[d].rows.forEach(function(r){ var x = r.slice(); x[0] = d; spo.push(x); }); });
+    var ep = S.ep.rows, ab = S.ab.rows;
+
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(media), "매체_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ep), "EP_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(spo), "SPO_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ab), "에어브릿지_RAW");
+    var d = same && vals[0] && /^\d{4}-/.test(vals[0]) ? vals[0].slice(2).replace(/-/g, "") : (S.media.PC.date || "").slice(2).replace(/-/g, "");
+    var name = "쇼검RAW_" + (d || "날짜확인") + ".xlsx";
+    XLSX.writeFile(wb, name, { compression:true });
+
+    // 합계
+    var sum = function(rows, i){ return rows.reduce(function(s, r){ return s + toNum0(r[i]); }, 0); };
+    var spoH = ["No","분류명","상품명","상품코드","예상취급액","순주문수량","순주문금액","주문건수","주문수량","주문금액"];
+    var rowsT = [
+      ["매체_RAW", "A3", media.length, "노출 " + fmtN(sum(media, 3)) + " · 클릭 " + fmtN(sum(media, 4)) + " · 총비용 " + fmtN(sum(media, 5))],
+      ["EP_RAW", "B3", ep.length, S.ep.dropped ? "소재 ID 빈 행 " + fmtN(S.ep.dropped) + "개 삭제" : ""],
+      ["SPO_RAW", "E3", spo.length, "PC " + fmtN(S.spo.PC.rows.length) + "행 · MO " + fmtN(S.spo.MO.rows.length) + "행 · 주문건수 " + fmtN(sum(spo, 7)) + " · 주문금액 " + fmtN(sum(spo, 9))],
+      ["에어브릿지_RAW", "E3", ab.length, "회원가입 " + fmtN(sum(ab, 8)) + " · 구매 완료 " + fmtN(sum(ab, 10)) + " · 구매액 " + fmtN(sum(ab, 13))]
+    ];
+    say("msg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다. 시트마다 헤더 없이 데이터만 들어 있으니, 아래 위치에 붙여넣으세요." + (warn.length ? " 확인이 필요한 항목이 있습니다." : ""), warn);
+    $("table").innerHTML = "<div class='tablebox'><table><thead><tr><th>시트</th><th>붙여넣을 위치</th><th class='n'>행 수</th><th>합계·참고</th></tr></thead><tbody>" +
+      rowsT.map(function(r){ return "<tr><td>" + esc(r[0]) + "</td><td>" + r[1] + "</td><td class='n'>" + fmtN(r[2]) + "</td><td>" + esc(r[3]) + "</td></tr>"; }).join("") +
+      "</tbody></table></div>";
+  };
+})();
+</script>
+</body>
+</html>
