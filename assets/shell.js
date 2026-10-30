@@ -27,7 +27,9 @@ var NAV = [
   { path:"signup-report/", label:"회원가입 리포트 가공", icon:"◧",
     desc:"에어브릿지 회원가입·일간보고서를 취합해 AB_RAW용 데이터를 만듭니다." },
   { path:"product-lists/", label:"상품 목록 관리", icon:"☰",
-    desc:"백화점·슈퍼브랜드 목록을 템플릿으로 날짜별 등록합니다." }
+    desc:"백화점·슈퍼브랜드 목록을 템플릿으로 날짜별 등록합니다." },
+  { path:"ss-raw/", label:"쇼검 RAW 만들기", icon:"⊟",
+    desc:"매체·SPO·에어브릿지·소재 파일로 쇼검 효율관리 RAW 시트 4개용 데이터를 만듭니다." }
 ];
 
 (function(){
