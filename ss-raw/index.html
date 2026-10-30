@@ -97,7 +97,7 @@ tbody tr:last-child td{border-bottom:0}
 
   // 숫자처럼 생긴 글자는 숫자로 (쉼표 제거). 아니면 그대로
   function num(v){
-    if(typeof v === "number") return v;
+    if(typeof v === "number") return isFinite(v) ? v : "";
     var s = String(v == null ? "" : v).trim();
     if(/^-?[\d,]+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g, ""));
     return s;
@@ -148,7 +148,7 @@ tbody tr:last-child td{border-bottom:0}
     }
     var dev = pc > mo ? "PC" : mo > pc ? "MO" : "";
     if(!dev) throw new Error(file.name + ": 캠페인 이름으로 PC·MO를 알 수 없습니다.");
-    return { dev:dev, item:{ file:file, rows:out, date:date } };
+    return { dev:dev, item:{ file:file, rows:out, date:date, head:head.slice(0, 6) } };
   }
 
   function readAb(file, text){
@@ -163,10 +163,36 @@ tbody tr:last-child td{border-bottom:0}
     return { file:file, rows:out, date: m && m[1] === m[2] ? m[1] : "", range: m ? m[1] + " ~ " + m[2] : "", head:h };
   }
 
+  // SPO 파일은 확장자는 xls지만 실제로는 엑셀 2003 XML 형식입니다.
+  // 숫자 칸에 "124,370"처럼 쉼표가 들어 있어 엑셀 라이브러리로 읽으면 깨지므로, 글자 그대로 직접 읽습니다.
+  function readSpreadsheetXml(text){
+    var NS = "urn:schemas-microsoft-com:office:spreadsheet";
+    var doc = new DOMParser().parseFromString(text, "application/xml");
+    if(doc.getElementsByTagName("parsererror").length) throw new Error("XML을 읽지 못했습니다.");
+    var ws = doc.getElementsByTagNameNS(NS, "Worksheet")[0];
+    if(!ws) throw new Error("시트를 찾지 못했습니다.");
+    var rows = [];
+    Array.prototype.forEach.call(ws.getElementsByTagNameNS(NS, "Row"), function(rEl){
+      var row = [];
+      Array.prototype.forEach.call(rEl.getElementsByTagNameNS(NS, "Cell"), function(cEl){
+        var idx = cEl.getAttributeNS(NS, "Index") || cEl.getAttribute("ss:Index");
+        if(idx){ while(row.length < Number(idx) - 1) row.push(""); }
+        var d = cEl.getElementsByTagNameNS(NS, "Data")[0];
+        row.push(d ? d.textContent : "");
+      });
+      rows.push(row);
+    });
+    return rows;
+  }
+
   async function readSpo(file){
-    var wb = XLSX.read(await file.arrayBuffer(), { type:"array" });
-    var ws = wb.Sheets[wb.SheetNames[0]];
-    var rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:"" });
+    var rows;
+    var head = (await file.slice(0, 200).text()).trim();
+    if(/^<\?xml/i.test(head)) rows = readSpreadsheetXml(await readText(file));
+    else{
+      var wb = XLSX.read(await file.arrayBuffer(), { type:"array", raw:true });
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, raw:true, defval:"" });
+    }
     var hr = -1;
     for(var i = 0; i < Math.min(rows.length, 10); i++){ if(String(rows[i][0]).trim() === "No" && rows[i].indexOf("상품코드") >= 0){ hr = i; break; } }
     if(hr < 0) throw new Error(file.name + ": No·상품코드 헤더를 찾지 못했습니다.");
@@ -180,7 +206,7 @@ tbody tr:last-child td{border-bottom:0}
       out.push(r.map(function(v, k){ return k <= 3 ? String(v) : num(v); }));
     }
     var from = pm ? dotDate(pm[1]) : "", to = pm ? dotDate(pm[2]) : "";
-    return { file:file, rows:out, date: from && from === to ? from : "", range: pm ? from + " ~ " + to : "" };
+    return { file:file, rows:out, date: from && from === to ? from : "", range: pm ? from + " ~ " + to : "", head: rows[hr].map(String) };
   }
 
   // 쇼핑검색 소재 → EP_RAW 7개 열 (쇼핑검색 소재 변환과 같은 규칙) + 소재 ID 빈 행 삭제
@@ -189,10 +215,11 @@ tbody tr:last-child td{border-bottom:0}
     var ws = wb.Sheets[wb.SheetNames[0]];
     var rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, blankrows:false });
     var norm = function(v){ return String(v == null ? "" : v).replace(/\s+/g, ""); };
-    var out = [], dropped = 0, conv = false;
+    var out = [], dropped = 0, conv = false, head = [];
     // 이미 변환된 파일(1행: 디바이스, 소재 ID …)도 받기
     if(norm(rows[0] && rows[0][0]) === "디바이스" && norm(rows[0][1]) === "소재ID"){
       conv = true;
+      head = rows[0].slice(0, 7).map(function(v){ return v == null ? "" : String(v); });
       for(var i = 1; i < rows.length; i++){
         var r = rows[i] || [];
         if(!String(r[1] == null ? "" : r[1]).trim()){ dropped++; continue; }
@@ -205,6 +232,7 @@ tbody tr:last-child td{border-bottom:0}
       for(var k = 0; k < Math.min(rows.length, 10); k++){ if(norm(rows[k] && rows[k][1]) === "디바이스"){ hdr = k; break; } }
       if(hdr < 0) throw new Error(file.name + ": 쇼핑검색 소재 파일의 헤더(B열 디바이스)를 찾지 못했습니다.");
       var ORDER = [1, 10, 11, 12, 13, 14, 2];   // B, K, L, M, N, O, C
+      head = ORDER.map(function(c){ var v = rows[hdr][c]; return v == null ? "" : String(v); });
       for(var j = hdr + 1; j < rows.length; j++){
         var rr = rows[j] || [];
         if(!String(rr[10] == null ? "" : rr[10]).trim()){ dropped++; continue; }
@@ -213,7 +241,7 @@ tbody tr:last-child td{border-bottom:0}
         out.push(y);
       }
     }
-    return { file:file, rows:out, dropped:dropped, conv:conv };
+    return { file:file, rows:out, dropped:dropped, conv:conv, head:head };
   }
 
   /* ── 파일 구분 ── */
@@ -301,10 +329,11 @@ tbody tr:last-child td{border-bottom:0}
     var ep = S.ep.rows, ab = S.ab.rows;
 
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(media), "매체_RAW");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ep), "EP_RAW");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(spo), "SPO_RAW");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ab), "에어브릿지_RAW");
+    // 1행은 원본 헤더, 2행부터 붙여넣을 데이터
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.media.PC.head].concat(media)), "매체_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.ep.head].concat(ep)), "EP_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.spo.PC.head].concat(spo)), "SPO_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.ab.head].concat(ab)), "에어브릿지_RAW");
     var d = same && vals[0] && /^\d{4}-/.test(vals[0]) ? vals[0].slice(2).replace(/-/g, "") : (S.media.PC.date || "").slice(2).replace(/-/g, "");
     var name = "쇼검RAW_" + (d || "날짜확인") + ".xlsx";
     XLSX.writeFile(wb, name, { compression:true });
@@ -318,8 +347,8 @@ tbody tr:last-child td{border-bottom:0}
       ["SPO_RAW", "E3", spo.length, "PC " + fmtN(S.spo.PC.rows.length) + "행 · MO " + fmtN(S.spo.MO.rows.length) + "행 · 주문건수 " + fmtN(sum(spo, 7)) + " · 주문금액 " + fmtN(sum(spo, 9))],
       ["에어브릿지_RAW", "E3", ab.length, "회원가입 " + fmtN(sum(ab, 8)) + " · 구매 완료 " + fmtN(sum(ab, 10)) + " · 구매액 " + fmtN(sum(ab, 13))]
     ];
-    say("msg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다. 시트마다 헤더 없이 데이터만 들어 있으니, 아래 위치에 붙여넣으세요." + (warn.length ? " 확인이 필요한 항목이 있습니다." : ""), warn);
-    $("table").innerHTML = "<div class='tablebox'><table><thead><tr><th>시트</th><th>붙여넣을 위치</th><th class='n'>행 수</th><th>합계·참고</th></tr></thead><tbody>" +
+    say("msg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다. 시트마다 1행은 원본 헤더이고 2행부터 데이터입니다. 2행부터 복사해서 아래 위치에 붙여넣으세요." + (warn.length ? " 확인이 필요한 항목이 있습니다." : ""), warn);
+    $("table").innerHTML = "<div class='tablebox'><table><thead><tr><th>시트</th><th>붙여넣을 위치 (2행부터 복사)</th><th class='n'>행 수</th><th>합계·참고</th></tr></thead><tbody>" +
       rowsT.map(function(r){ return "<tr><td>" + esc(r[0]) + "</td><td>" + r[1] + "</td><td class='n'>" + fmtN(r[2]) + "</td><td>" + esc(r[3]) + "</td></tr>"; }).join("") +
       "</tbody></table></div>";
   };
