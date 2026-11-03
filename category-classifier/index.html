@@ -39,6 +39,13 @@ th,td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); ve
 th{background:var(--surface2); font-weight:700; font-size:12.5px; color:var(--muted); white-space:nowrap}
 tbody tr:last-child td{border-bottom:0}
 tr.low td{background:color-mix(in srgb, var(--warn-soft) 60%, transparent)}
+tr.grp td{background:var(--surface2); font-weight:700; font-size:13px; cursor:pointer; user-select:none}
+tr.grp td .gc{font-weight:400; color:var(--muted); margin-left:6px}
+tr.grp td .arrow{display:inline-block; width:14px; color:var(--muted)}
+tr.hide{display:none}
+.summary{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+.summary span{font-size:12.5px; padding:3px 10px; border-radius:20px; border:1px solid var(--line); background:var(--surface2)}
+.summary span b{font-variant-numeric:tabular-nums}
 td.name{min-width:220px}
 td.name small{display:block; color:var(--muted); font-size:11.5px}
 .cands{display:flex; flex-direction:column; gap:5px; min-width:300px}
@@ -86,13 +93,14 @@ details.box[open] summary{margin-bottom:12px; color:var(--ink)}
 
 <div class="card" id="resultCard" hidden>
   <h2>분류 결과</h2>
-  <p class="hint">후보 중에서 고르거나 아래 칸에 직접 입력하세요. 점수가 낮은 행(30% 미만)은 붉게 표시됩니다. <b>복사하고 기록에 저장</b>을 누르면 고른 결과가 기록에 자동으로 쌓여 다음 분류부터 쓰입니다.</p>
+  <p class="hint">점수에 따라 기록 일치 → 빠른 확인(80% 이상) → 검토(45~80%) → 집중 확인(45% 미만) 순서로, 묶음 안에서는 점수 높은 순으로 보여줍니다. 묶음 제목을 누르면 접고 펼 수 있습니다. 복사는 화면 순서와 상관없이 처음 붙여넣은 순서대로 나갑니다. <b>복사하고 기록에 저장</b>을 누르면 고른 결과가 기록에 자동으로 쌓입니다.</p>
   <div class="actions">
     <button class="btn primary" id="copySave">복사하고 기록에 저장</button>
     <button class="btn" id="copyOnly">복사만</button>
     <span class="count">입력한 순서대로 대분류·카테고리 두 열이 복사됩니다 (효율관리 결괏값 J·K열)</span>
   </div>
   <div id="resMsg"></div>
+  <div class="summary" id="resSum"></div>
   <div class="tablebox"><table><thead><tr><th>#</th><th>상품</th><th>후보 · 직접 입력</th><th>상태</th></tr></thead><tbody id="resBody"></tbody></table></div>
 </div>
 
@@ -343,22 +351,52 @@ details.box[open] summary{margin-bottom:12px; color:var(--ink)}
     if(r.sel !== 0) return "<span class='tag pick'>후보 선택</span>";
     return "<span class='tag auto'>자동 1등</span>";
   }
+  var GROUPS = [
+    { key:"rec",   name:"기록 일치",   desc:"같은 상품ID 기록",  open:false },
+    { key:"fast",  name:"빠른 확인",   desc:"점수 80% 이상",      open:true },
+    { key:"check", name:"검토",        desc:"점수 45~80%",        open:true },
+    { key:"focus", name:"집중 확인",   desc:"점수 45% 미만",      open:true }
+  ];
+  var OPEN = {};
+  GROUPS.forEach(function(g){ OPEN[g.key] = g.open; });
+  function groupOf(r){
+    if(r.exact) return "rec";
+    var s = r.cands[0] ? r.cands[0].score : 0;
+    return s >= 0.8 ? "fast" : s >= 0.45 ? "check" : "focus";
+  }
+  function rowHtml(r, i, bigOpts){
+    var g = groupOf(r);
+    var cands = r.cands.map(function(c, k){
+      return "<label class='cand" + (r.sel === k ? " on" : "") + "'><input type='radio' name='s" + i + "' data-i='" + i + "' data-k='" + k + "'" + (r.sel === k ? " checked" : "") + ">" +
+        "<span class='path'><b>" + esc(c.big) + "</b> › " + esc(c.cat) + "<span class='meta'>" + (r.exact ? "같은 상품ID 기록" : Math.round(c.score * 100) + "% · 비슷한 상품: " + esc(c.example)) + "</span></span></label>";
+    }).join("");
+    var manual = "<label class='cand" + (r.sel === "m" ? " on" : "") + "'><input type='radio' name='s" + i + "' data-i='" + i + "' data-k='m'" + (r.sel === "m" ? " checked" : "") + ">" +
+      "<span class='path' style='flex:1'>직접 입력<span class='manual'><select data-i='" + i + "' data-f='mBig'><option value=''>대분류</option>" + bigOpts + "</select>" +
+      "<input type='text' list='catList' data-i='" + i + "' data-f='mCat' placeholder='카테고리 전체 경로' value='" + esc(r.mCat) + "'></span></span></label>";
+    return "<tr data-g='" + g + "' class='" + (g === "focus" ? "low" : "") + (OPEN[g] ? "" : " hide") + "' id='row" + i + "'><td>" + (i + 1) + "</td><td class='name'>" + esc(r.name) + (r.id ? "<small>" + esc(r.id) + "</small>" : "") + "</td>" +
+      "<td><div class='cands'>" + cands + manual + "</div></td><td id='st" + i + "'>" + stateTag(r) + "</td></tr>";
+  }
   function renderRes(){
     var bigOpts = BIGS.map(function(b){ return "<option>" + esc(b) + "</option>"; }).join("");
-    $("resBody").innerHTML = RES.map(function(r, i){
-      var low = !r.exact && r.cands[0] && r.cands[0].score < 0.3;
-      var cands = r.cands.map(function(c, k){
-        return "<label class='cand" + (r.sel === k ? " on" : "") + "'><input type='radio' name='s" + i + "' data-i='" + i + "' data-k='" + k + "'" + (r.sel === k ? " checked" : "") + ">" +
-          "<span class='path'><b>" + esc(c.big) + "</b> › " + esc(c.cat) + "<span class='meta'>" + (r.exact ? "같은 상품ID 기록" : Math.round(c.score * 100) + "% · 비슷한 상품: " + esc(c.example)) + "</span></span></label>";
-      }).join("");
-      var manual = "<label class='cand" + (r.sel === "m" ? " on" : "") + "'><input type='radio' name='s" + i + "' data-i='" + i + "' data-k='m'" + (r.sel === "m" ? " checked" : "") + ">" +
-        "<span class='path' style='flex:1'>직접 입력<span class='manual'><select data-i='" + i + "' data-f='mBig'><option value=''>대분류</option>" + bigOpts + "</select>" +
-        "<input type='text' list='catList' data-i='" + i + "' data-f='mCat' placeholder='카테고리 전체 경로' value='" + esc(r.mCat) + "'></span></span></label>";
-      return "<tr class='" + (low ? "low" : "") + "' id='row" + i + "'><td>" + (i + 1) + "</td><td class='name'>" + esc(r.name) + (r.id ? "<small>" + esc(r.id) + "</small>" : "") + "</td>" +
-        "<td><div class='cands'>" + cands + manual + "</div></td><td id='st" + i + "'>" + stateTag(r) + "</td></tr>";
-    }).join("");
+    var buckets = {}; GROUPS.forEach(function(g){ buckets[g.key] = []; });
+    RES.forEach(function(r, i){ buckets[groupOf(r)].push(i); });
+    var html = "";
+    GROUPS.forEach(function(g){
+      var idx = buckets[g.key]; if(!idx.length) return;
+      idx.sort(function(a, b){ return (RES[b].cands[0] ? RES[b].cands[0].score : 0) - (RES[a].cands[0] ? RES[a].cands[0].score : 0) || a - b; });   // 점수 높은 순
+      html += "<tr class='grp' data-grp='" + g.key + "'><td colspan='4'><span class='arrow'>" + (OPEN[g.key] ? "▾" : "▸") + "</span>" + g.name + " " + idx.length + "개<span class='gc'>" + g.desc + "</span></td></tr>";
+      html += idx.map(function(i){ return rowHtml(RES[i], i, bigOpts); }).join("");
+    });
+    $("resBody").innerHTML = html;
+    $("resSum").innerHTML = GROUPS.map(function(g){ return "<span>" + g.name + " <b>" + buckets[g.key].length + "</b></span>"; }).join("");
     RES.forEach(function(r, i){ var s = document.querySelector("select[data-i='" + i + "']"); if(s) s.value = r.mBig; });
   }
+  $("resBody").addEventListener("click", function(e){
+    var tr = e.target.closest("tr.grp"); if(!tr) return;
+    var k = tr.dataset.grp; OPEN[k] = !OPEN[k];
+    tr.querySelector(".arrow").textContent = OPEN[k] ? "▾" : "▸";
+    $("resBody").querySelectorAll("tr[data-g='" + k + "']").forEach(function(row){ row.classList.toggle("hide", !OPEN[k]); });
+  });
   $("resBody").addEventListener("change", function(e){
     var t = e.target, i = Number(t.dataset.i); if(isNaN(i)) return;
     var r = RES[i];
