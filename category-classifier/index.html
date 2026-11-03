@@ -11,6 +11,11 @@
 <script src="../assets/config.js"></script>
 <script src="../assets/shell.js" defer></script>
 <style>
+/* 이 페이지는 표가 넓어서 화면 폭을 넓게 씁니다 */
+.wrap{max-width:1680px}
+textarea#input{min-height:200px}
+td.name{width:28%}
+.cands{min-width:420px}
 .card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow)}
 .card h2{font-size:15px; font-weight:700; margin:0 0 4px}
 .card p.hint{color:var(--muted); font-size:13px; margin:0 0 14px}
@@ -93,12 +98,13 @@ details.box[open] summary{margin-bottom:12px; color:var(--ink)}
 
 <div class="card" id="resultCard" hidden>
   <h2>분류 결과</h2>
-  <p class="hint">점수에 따라 기록 일치 → 빠른 확인(80% 이상) → 검토(45~80%) → 집중 확인(45% 미만) 순서로, 묶음 안에서는 점수 높은 순으로 보여줍니다. 묶음 제목을 누르면 접고 펼 수 있습니다. 복사는 화면 순서와 상관없이 처음 붙여넣은 순서대로 나갑니다. <b>복사하고 기록에 저장</b>을 누르면 고른 결과가 기록에 자동으로 쌓입니다.</p>
+  <p class="hint">점수에 따라 기록 일치 → 빠른 확인(80% 이상) → 검토(45~80%) → 집중 확인(45% 미만) 순서로, 묶음 안에서는 점수 높은 순으로 보여줍니다. 묶음 제목을 누르면 접고 펼 수 있습니다. 복사는 화면 순서와 상관없이 처음 붙여넣은 순서대로 나갑니다. “기록에도 저장”이 켜진 채로 복사하거나 CSV를 받으면 고른 결과가 기록에 자동으로 쌓입니다.</p>
   <div class="actions">
-    <button class="btn primary" id="copySave">복사하고 기록에 저장</button>
-    <button class="btn" id="copyOnly">복사만</button>
-    <span class="count">입력한 순서대로 대분류·카테고리 두 열이 복사됩니다 (효율관리 결괏값 J·K열)</span>
+    <button class="btn primary" id="copyBtn">대분류·카테고리 복사</button>
+    <button class="btn" id="csvBtn">CSV 다운로드</button>
+    <label class="count" style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" id="saveCk" checked style="accent-color:var(--accent)"> 기록에도 저장</label>
   </div>
+  <p class="count" style="margin:8px 0 0">복사는 입력한 순서대로 대분류·카테고리 두 열이 나갑니다 (효율관리 결괏값 J·K열). CSV에는 상품ID·상품명·점수 등이 함께 들어갑니다. “기록에도 저장”이 켜져 있으면 고른 결과가 기록에 쌓여 다음 분류부터 쓰입니다.</p>
   <div id="resMsg"></div>
   <div class="summary" id="resSum"></div>
   <div class="tablebox"><table><thead><tr><th>#</th><th>상품</th><th>후보 · 직접 입력</th><th>상태</th></tr></thead><tbody id="resBody"></tbody></table></div>
@@ -413,29 +419,56 @@ details.box[open] summary{margin-bottom:12px; color:var(--ink)}
     var t = e.target; if(t.dataset && t.dataset.f === "mCat"){ var i = Number(t.dataset.i); RES[i].mCat = t.value; if(RES[i].sel !== "m"){ RES[i].sel = "m"; t.dispatchEvent(new Event("change", { bubbles:true })); } }
   });
 
-  async function copyResult(){
+  function checkManual(){
     var miss = [];
-    var tsv = RES.map(function(r, i){ var c = chosen(r); if(!c.big || !c.cat) miss.push(i + 1); return c.big + "\t" + c.cat; }).join("\n");
-    if(miss.length){ say("resMsg", "warn", "직접 입력을 골랐는데 대분류나 카테고리가 비어 있는 행이 있습니다: " + miss.join(", ") + "번"); return null; }
-    try{ await navigator.clipboard.writeText(tsv); }catch(e){ say("resMsg", "warn", "복사하지 못했습니다. 브라우저가 클립보드를 막았을 수 있습니다."); return null; }
+    RES.forEach(function(r, i){ var c = chosen(r); if(!c.big || !c.cat) miss.push(i + 1); });
+    if(miss.length){ say("resMsg", "warn", "직접 입력을 골랐는데 대분류나 카테고리가 비어 있는 행이 있습니다: " + miss.join(", ") + "번"); return false; }
     return true;
   }
-  $("copyOnly").onclick = async function(){ if(await copyResult()) say("resMsg", "ok", fmtN(RES.length) + "행을 복사했습니다. 기록에는 저장하지 않았습니다."); };
-  $("copySave").onclick = async function(){
-    if(!(await copyResult())) return;
-    // 기록과 똑같은 결과(같은 상품ID 기록을 그대로 쓴 행)는 다시 저장하지 않음
+  var GNAME = { rec:"기록 일치", fast:"빠른 확인", check:"검토", focus:"집중 확인" };
+  function stateText(r){ return r.sel === "m" ? "직접 입력" : r.exact ? "기록 일치" : r.sel !== 0 ? "후보 선택" : "자동 1등"; }
+
+  // 기록에 저장 (체크되어 있을 때만). 같은 상품ID 기록을 그대로 쓴 행은 다시 저장하지 않음
+  async function saveIfChecked(doneText){
+    if(!$("saveCk").checked){ say("resMsg", "ok", doneText + " 기록에는 저장하지 않았습니다."); return; }
     var save = RES.filter(function(r){ return !(r.exact && r.sel === 0); }).map(function(r){ var c = chosen(r); return { id: r.id, big: c.big, cat: c.cat, name: r.name, source: "manual" }; });
-    if(!save.length){ say("resMsg", "ok", fmtN(RES.length) + "행을 복사했습니다. 모두 기존 기록과 같아서 새로 저장할 것은 없습니다."); return; }
-    say("resMsg", "load", "복사했습니다. 기록에 저장하는 중입니다…");
-    $("copySave").disabled = true;
+    if(!save.length){ say("resMsg", "ok", doneText + " 모두 기존 기록과 같아서 새로 저장할 것은 없습니다."); return; }
+    say("resMsg", "load", doneText + " 기록에 저장하는 중입니다…");
+    $("copyBtn").disabled = $("csvBtn").disabled = true;
     try{
       await upsert(save);
-      say("resMsg", "ok", fmtN(RES.length) + "행을 복사했고, " + fmtN(save.length) + "건을 기록에 저장했습니다. 다음 분류부터 반영됩니다.");
+      say("resMsg", "ok", doneText + " " + fmtN(save.length) + "건을 기록에 저장했습니다. 다음 분류부터 반영됩니다.");
       await reload();
     }catch(e){
       console.error(e);
-      say("resMsg", "warn", "복사는 했지만 기록 저장에 실패했습니다: " + esc(e && e.message ? e.message : e));
-    }finally{ $("copySave").disabled = false; }
+      say("resMsg", "warn", doneText + " 하지만 기록 저장에 실패했습니다: " + esc(e && e.message ? e.message : e));
+    }finally{ $("copyBtn").disabled = $("csvBtn").disabled = false; }
+  }
+
+  $("copyBtn").onclick = async function(){
+    if(!checkManual()) return;
+    var tsv = RES.map(function(r){ var c = chosen(r); return c.big + "\t" + c.cat; }).join("\n");
+    try{ await navigator.clipboard.writeText(tsv); }
+    catch(e){ say("resMsg", "warn", "복사하지 못했습니다. 브라우저가 클립보드를 막았을 수 있습니다."); return; }
+    await saveIfChecked(fmtN(RES.length) + "행을 복사했습니다.");
+  };
+
+  $("csvBtn").onclick = async function(){
+    if(!checkManual()) return;
+    var head = ["순번","상품ID","상품명","대분류","카테고리","점수","묶음","상태","비슷한 상품"];
+    var lines = [head].concat(RES.map(function(r, i){
+      var c = chosen(r), cand = r.sel === "m" ? null : r.cands[r.sel];
+      return [i + 1, r.id || "", r.name, c.big, c.cat,
+              r.exact ? "기록 일치" : cand ? Math.round(cand.score * 100) + "%" : "",
+              GNAME[groupOf(r)], stateText(r), cand && !r.exact ? cand.example : ""];
+    }));
+    var csv = "\uFEFF" + lines.map(function(row){ return row.map(function(v){ v = String(v == null ? "" : v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\r\n") + "\r\n";
+    var d = new Date(), stamp = String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0") + "_" + String(d.getHours()).padStart(2, "0") + String(d.getMinutes()).padStart(2, "0");
+    var url = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" }));
+    var a = document.createElement("a"); a.href = url; a.download = "카테고리분류_" + stamp + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    await saveIfChecked("CSV를 받았습니다.");
   };
 
   /* ===== 기록 올리기 ===== */
