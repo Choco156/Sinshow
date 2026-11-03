@@ -356,12 +356,19 @@ tbody tr:last-child td{border-bottom:0}
       var v = piv[k];
       return [k, v[0], v[1], v[2]].concat(info(k, k.slice(0, 2), k.slice(2), ""));
     });
-    var seen = {}, onlyIn = [], onlyOut = [];
+    // SPO에만 있는 키 중 주문건수(L열) 또는 주문금액(N열)이 있는 것만 (효율관리 SPO_RAW B·C열과 같은 값)
+    var spoAgg = {}, spoOrder = [];
     spo.forEach(function(r){
       var k = r[0] + String(r[3]).trim();
-      if(seen[k] || piv[k]) return;
-      seen[k] = true;
-      var row = [k, 0, 0, 0].concat(info(k, r[0], String(r[3]).trim(), r[2]));
+      if(piv[k]) return;
+      if(!spoAgg[k]){ spoAgg[k] = { r: r, cnt: 0, amt: 0 }; spoOrder.push(k); }
+      spoAgg[k].cnt += toNum0(r[7]); spoAgg[k].amt += toNum0(r[9]);
+    });
+    var onlyIn = [], onlyOut = [], skipNoSale = 0;
+    spoOrder.forEach(function(k){
+      var a = spoAgg[k];
+      if(a.cnt === 0 && a.amt === 0){ skipNoSale++; return; }
+      var row = [k, 0, 0, 0].concat(info(k, a.r[0], String(a.r[3]).trim(), a.r[2]));
       (byK[k] ? onlyIn : onlyOut).push(row);
     });
     var noInfo = Object.keys(piv).filter(function(k){ return !byK[k]; }).length;
@@ -388,7 +395,7 @@ tbody tr:last-child td{border-bottom:0}
       ["EP_RAW", "B3", ep.length, S.ep.dropped ? "소재 ID 빈 행 " + fmtN(S.ep.dropped) + "개 삭제" : ""],
       ["SPO_RAW", "E3", spo.length, "PC " + fmtN(S.spo.PC.rows.length) + "행 · MO " + fmtN(S.spo.MO.rows.length) + "행 · 주문건수 " + fmtN(sum(spo, 7)) + " · 주문금액 " + fmtN(sum(spo, 9))],
       ["에어브릿지_RAW", "E3", ab.length, "회원가입 " + fmtN(sum(ab, 8)) + " · 구매 완료 " + fmtN(sum(ab, 10)) + " · 구매액 " + fmtN(sum(ab, 13))],
-      ["결괏값", "E3", resRows.length, "매체 키 " + fmtN(Object.keys(piv).length) + " · SPO에만 있는 키 " + fmtN(onlyIn.length + onlyOut.length) + " (카테고리 입력 필요 " + fmtN(onlyOut.length) + ") · 노출 " + fmtN(sum(resRows, 1)) + " · 클릭 " + fmtN(sum(resRows, 2)) + " · vat- " + fmtN(sum(resRows, 3))]
+      ["결괏값", "E3", resRows.length, "매체 키 " + fmtN(Object.keys(piv).length) + " · SPO에만 있고 주문 있는 키 " + fmtN(onlyIn.length + onlyOut.length) + " (카테고리 입력 필요 " + fmtN(onlyOut.length) + (skipNoSale ? ", 주문 없어 제외 " + fmtN(skipNoSale) : "") + ") · 노출 " + fmtN(sum(resRows, 1)) + " · 클릭 " + fmtN(sum(resRows, 2)) + " · vat- " + fmtN(sum(resRows, 3))]
     ];
     say("msg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다. 시트마다 1행은 원본 헤더이고 2행부터 데이터입니다. 2행부터 복사해서 아래 위치에 붙여넣으세요." + (warn.length ? " 확인이 필요한 항목이 있습니다." : ""), warn);
     $("table").innerHTML = "<div class='tablebox'><table><thead><tr><th>시트</th><th>붙여넣을 위치 (2행부터 복사)</th><th class='n'>행 수</th><th>합계·참고</th></tr></thead><tbody>" +
