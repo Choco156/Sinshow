@@ -54,7 +54,7 @@ tbody tr:last-child td{border-bottom:0}
 
 <header class="home-head">
   <h1>쇼검 RAW 만들기</h1>
-  <span class="sub">쇼핑검색 효율관리 파일의 RAW 시트 4개에 붙일 데이터를 한 번에 만듭니다</span>
+  <span class="sub">쇼핑검색 효율관리 파일의 RAW 시트 4개와 결괏값에 붙일 데이터를 한 번에 만듭니다</span>
 </header>
 
 <div class="card">
@@ -328,12 +328,54 @@ tbody tr:last-child td{border-bottom:0}
     ["PC","MO"].forEach(function(d){ S.spo[d].rows.forEach(function(r){ var x = r.slice(); x[0] = d; spo.push(x); }); });
     var ep = S.ep.rows, ab = S.ab.rows;
 
+    /* ── 결괏값 (효율관리 파일 결괏값 E~M열) ── */
+    var byS = {}, byK = {};
+    ep.forEach(function(r){
+      var sid = String(r[1] == null ? "" : r[1]).trim();
+      if(sid && !byS[sid]) byS[sid] = r;
+      var k = String(r[0] == null ? "" : r[0]).trim() + String(r[5] == null ? "" : r[5]).trim();
+      if(!byK[k]) byK[k] = r;
+    });
+    var piv = {}, na = [0, 0, 0], naRows = 0;
+    media.forEach(function(r){
+      var dev = /_PC/i.test(r[1]) ? "PC" : /_MO/i.test(r[1]) ? "MO" : "";
+      var e = byS[String(r[2]).trim()];
+      var imp = toNum0(r[3]), clk = toNum0(r[4]), vat = toNum0(r[5]) / 1.1;
+      if(!e || !dev){ na[0] += imp; na[1] += clk; na[2] += vat; naRows++; return; }   // 피벗의 #N/A 줄 → 결괏값에서 제외
+      var k = dev + String(e[5]).trim();
+      if(!piv[k]) piv[k] = [0, 0, 0];
+      piv[k][0] += imp; piv[k][1] += clk; piv[k][2] += vat;
+    });
+    function info(k, dev, fallbackPid, fallbackName){
+      var e = byK[k];
+      if(e) return [e[0], e[6], e[4], e[5], e[3]];          // 디바이스, 카테고리(CAT2), 네이버기준_카테고리, 상품ID, 상품명
+      var pid = /^\d+$/.test(fallbackPid) ? Number(fallbackPid) : fallbackPid;
+      return [dev, "", "", pid, fallbackName];
+    }
+    var resRows = Object.keys(piv).sort().map(function(k){
+      var v = piv[k];
+      return [k, v[0], v[1], v[2]].concat(info(k, k.slice(0, 2), k.slice(2), ""));
+    });
+    var seen = {}, onlyIn = [], onlyOut = [];
+    spo.forEach(function(r){
+      var k = r[0] + String(r[3]).trim();
+      if(seen[k] || piv[k]) return;
+      seen[k] = true;
+      var row = [k, 0, 0, 0].concat(info(k, r[0], String(r[3]).trim(), r[2]));
+      (byK[k] ? onlyIn : onlyOut).push(row);
+    });
+    var noInfo = Object.keys(piv).filter(function(k){ return !byK[k]; }).length;
+    if(noInfo) warn.push("매체 키 중 " + fmtN(noInfo) + "개는 EP에서 같은 디바이스+상품ID를 찾지 못해 결괏값의 디바이스~상품명 칸이 비어 있습니다. 소재 파일이 최신인지 확인해 주세요.");
+    resRows = resRows.concat(onlyIn, onlyOut);              // 카테고리 입력이 필요한 행은 맨 아래
+    if(naRows) warn.push("EP에 없는 소재가 매체_RAW에 " + fmtN(naRows) + "행 있어 결괏값에서 빠졌습니다 (빠진 합계: 노출 " + fmtN(na[0]) + " · 클릭 " + fmtN(na[1]) + " · vat- " + fmtN(na[2]) + "). 소재 파일이 최신인지 확인해 주세요.");
+
     var wb = XLSX.utils.book_new();
     // 1행은 원본 헤더, 2행부터 붙여넣을 데이터
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.media.PC.head].concat(media)), "매체_RAW");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.ep.head].concat(ep)), "EP_RAW");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.spo.PC.head].concat(spo)), "SPO_RAW");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([S.ab.head].concat(ab)), "에어브릿지_RAW");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["행레이블","노출수","클릭수","vat-","디바이스","카테고리","네이버기준_카테고리","상품ID","상품명"]].concat(resRows)), "결괏값");
     var d = same && vals[0] && /^\d{4}-/.test(vals[0]) ? vals[0].slice(2).replace(/-/g, "") : (S.media.PC.date || "").slice(2).replace(/-/g, "");
     var name = "쇼검RAW_" + (d || "날짜확인") + ".xlsx";
     XLSX.writeFile(wb, name, { compression:true });
@@ -345,12 +387,15 @@ tbody tr:last-child td{border-bottom:0}
       ["매체_RAW", "A3", media.length, "노출 " + fmtN(sum(media, 3)) + " · 클릭 " + fmtN(sum(media, 4)) + " · 총비용 " + fmtN(sum(media, 5))],
       ["EP_RAW", "B3", ep.length, S.ep.dropped ? "소재 ID 빈 행 " + fmtN(S.ep.dropped) + "개 삭제" : ""],
       ["SPO_RAW", "E3", spo.length, "PC " + fmtN(S.spo.PC.rows.length) + "행 · MO " + fmtN(S.spo.MO.rows.length) + "행 · 주문건수 " + fmtN(sum(spo, 7)) + " · 주문금액 " + fmtN(sum(spo, 9))],
-      ["에어브릿지_RAW", "E3", ab.length, "회원가입 " + fmtN(sum(ab, 8)) + " · 구매 완료 " + fmtN(sum(ab, 10)) + " · 구매액 " + fmtN(sum(ab, 13))]
+      ["에어브릿지_RAW", "E3", ab.length, "회원가입 " + fmtN(sum(ab, 8)) + " · 구매 완료 " + fmtN(sum(ab, 10)) + " · 구매액 " + fmtN(sum(ab, 13))],
+      ["결괏값", "E3", resRows.length, "매체 키 " + fmtN(Object.keys(piv).length) + " · SPO에만 있는 키 " + fmtN(onlyIn.length + onlyOut.length) + " (카테고리 입력 필요 " + fmtN(onlyOut.length) + ") · 노출 " + fmtN(sum(resRows, 1)) + " · 클릭 " + fmtN(sum(resRows, 2)) + " · vat- " + fmtN(sum(resRows, 3))]
     ];
     say("msg", warn.length ? "warn" : "ok", esc(name) + " 파일로 저장했습니다. 시트마다 1행은 원본 헤더이고 2행부터 데이터입니다. 2행부터 복사해서 아래 위치에 붙여넣으세요." + (warn.length ? " 확인이 필요한 항목이 있습니다." : ""), warn);
     $("table").innerHTML = "<div class='tablebox'><table><thead><tr><th>시트</th><th>붙여넣을 위치 (2행부터 복사)</th><th class='n'>행 수</th><th>합계·참고</th></tr></thead><tbody>" +
       rowsT.map(function(r){ return "<tr><td>" + esc(r[0]) + "</td><td>" + r[1] + "</td><td class='n'>" + fmtN(r[2]) + "</td><td>" + esc(r[3]) + "</td></tr>"; }).join("") +
-      "</tbody></table></div>";
+      "</tbody></table></div>" +
+      (onlyOut.length ? "<p class='hint' style='margin:16px 0 6px'>카테고리(J·K열)를 직접 입력해야 하는 상품 " + onlyOut.length + "개 · 결괏값 시트 맨 아래에 있습니다</p><div class='tablebox' style='margin-top:0'><table><thead><tr><th>행레이블</th><th>상품명</th></tr></thead><tbody>" +
+        onlyOut.map(function(r){ return "<tr><td>" + esc(r[0]) + "</td><td>" + esc(r[8]) + "</td></tr>"; }).join("") + "</tbody></table></div>" : "");
   };
 })();
 </script>
