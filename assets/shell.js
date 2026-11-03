@@ -29,7 +29,9 @@ var NAV = [
   { path:"product-lists/", label:"상품 목록 관리", icon:"☰",
     desc:"백화점·슈퍼브랜드 목록을 템플릿으로 날짜별 등록합니다." },
   { path:"ss-raw/", label:"쇼검 RAW 만들기", icon:"⊟",
-    desc:"매체·SPO·에어브릿지·소재 파일로 쇼검 효율관리 RAW 시트 4개용 데이터를 만듭니다." }
+    desc:"매체·SPO·에어브릿지·소재 파일로 쇼검 효율관리 RAW 시트 4개용 데이터를 만듭니다." },
+  { path:"category-classifier/", label:"상품 카테고리 분류", icon:"◈",
+    desc:"쌓아 둔 분류 기록과 비교해 상품 카테고리 후보를 찾고, 고른 결과를 기록에 쌓습니다." }
 ];
 
 (function(){

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상품 카테고리 분류</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/shell.css">
+<script src="../assets/config.js"></script>
+<script src="../assets/shell.js" defer></script>
+<style>
+.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow)}
+.card h2{font-size:15px; font-weight:700; margin:0 0 4px}
+.card p.hint{color:var(--muted); font-size:13px; margin:0 0 14px}
+.status{font-size:13px; color:var(--muted); margin:-10px 0 16px}
+.status.err{color:var(--warn)}
+textarea{width:100%; min-height:140px; resize:vertical; font-family:inherit; font-size:13px; line-height:1.5; color:var(--ink); background:var(--surface2); border:1px solid var(--line); border-radius:7px; padding:10px 12px; outline:none}
+textarea:focus, input[type="text"]:focus, select:focus{border-color:var(--accent)}
+input[type="text"], select{font:inherit; font-size:13px; color:var(--ink); background:var(--surface2); border:1px solid var(--line); border-radius:6px; padding:5px 8px; outline:none}
+.btn{appearance:none; font:inherit; font-weight:500; cursor:pointer; border-radius:7px; padding:9px 16px; border:1px solid var(--line); background:var(--surface); color:var(--ink)}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.small{padding:4px 10px; font-size:12.5px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.actions{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.count{font-size:12.5px; color:var(--muted)}
+.msg{border-radius:8px; padding:11px 14px; font-size:13.5px; margin-top:14px}
+.msg.warn{background:var(--warn-soft); color:var(--warn); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent)}
+.msg.ok{background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent)}
+.msg.load{background:var(--surface2); color:var(--muted); border:1px solid var(--line)}
+.msg ul{margin:6px 0 0; padding-left:18px}
+.tablebox{overflow-x:auto; border:1px solid var(--line); border-radius:9px; background:var(--surface); margin-top:14px}
+table{border-collapse:collapse; width:100%; font-size:13px}
+th,td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top}
+th{background:var(--surface2); font-weight:700; font-size:12.5px; color:var(--muted); white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tr.low td{background:color-mix(in srgb, var(--warn-soft) 60%, transparent)}
+td.name{min-width:220px}
+td.name small{display:block; color:var(--muted); font-size:11.5px}
+.cands{display:flex; flex-direction:column; gap:5px; min-width:300px}
+.cand{display:flex; align-items:flex-start; gap:7px; padding:5px 8px; border:1px solid var(--line); border-radius:7px; cursor:pointer; background:var(--surface)}
+.cand:hover{background:var(--surface2)}
+.cand.on{border-color:var(--accent); background:var(--accent-soft)}
+.cand input{margin:3px 0 0; accent-color:var(--accent)}
+.cand .path{font-size:12.5px}
+.cand .path b{font-weight:700}
+.cand .meta{display:block; font-size:11px; color:var(--muted)}
+.manual{display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:2px}
+.manual input[type="text"]{flex:1; min-width:200px}
+.tag{font-size:11px; font-weight:700; padding:1px 8px; border-radius:20px; white-space:nowrap; display:inline-block}
+.tag.rec{background:var(--accent-soft); color:var(--accent)}
+.tag.auto{background:var(--surface2); color:var(--muted); border:1px solid var(--line)}
+.tag.pick{background:var(--accent-soft); color:var(--accent)}
+.tag.edit{background:var(--warn-soft); color:var(--warn)}
+details.box{margin-top:2px}
+details.box summary{cursor:pointer; font-size:13.5px; font-weight:500; color:var(--muted)}
+details.box summary:hover{color:var(--ink)}
+details.box[open] summary{margin-bottom:12px; color:var(--ink)}
+.linkbtn{appearance:none; border:0; background:none; font:inherit; font-size:12.5px; color:var(--muted); cursor:pointer; padding:0; text-decoration:underline}
+.linkbtn:hover{color:var(--warn)}
+@media (max-width:620px){ .home-head h1{font-size:20px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="home-head">
+  <h1>상품 카테고리 분류</h1>
+  <span class="sub">쌓아 둔 분류 기록과 비교해 비슷한 상품의 카테고리 후보를 찾아 줍니다</span>
+</header>
+<div class="status" id="status" role="status" aria-live="polite">기록을 불러오는 중입니다.</div>
+
+<div class="card">
+  <h2>분류할 상품</h2>
+  <p class="hint">엑셀에서 상품ID와 상품명 두 열을 복사해 붙여넣거나, 상품명만 한 줄에 하나씩 넣으세요. 상품ID가 있으면 예전에 분류한 상품은 바로 찾고, 새로 정한 결과도 상품ID로 기록에 쌓입니다.</p>
+  <textarea id="input" placeholder="1004172312	(신세계강남점)[BL] 하이넥 핫픽스 투웨이 집업점퍼&#10;또는 상품명만 한 줄에 하나씩"></textarea>
+  <div class="actions" style="margin-top:10px">
+    <button class="btn primary" id="run" disabled>분류하기</button>
+    <span class="count" id="inCount">0개</span>
+  </div>
+</div>
+
+<div class="card" id="resultCard" hidden>
+  <h2>분류 결과</h2>
+  <p class="hint">후보 중에서 고르거나 아래 칸에 직접 입력하세요. 점수가 낮은 행(30% 미만)은 붉게 표시됩니다. <b>복사하고 기록에 저장</b>을 누르면 고른 결과가 기록에 자동으로 쌓여 다음 분류부터 쓰입니다.</p>
+  <div class="actions">
+    <button class="btn primary" id="copySave">복사하고 기록에 저장</button>
+    <button class="btn" id="copyOnly">복사만</button>
+    <span class="count">입력한 순서대로 대분류·카테고리 두 열이 복사됩니다 (효율관리 결괏값 J·K열)</span>
+  </div>
+  <div id="resMsg"></div>
+  <div class="tablebox"><table><thead><tr><th>#</th><th>상품</th><th>후보 · 직접 입력</th><th>상태</th></tr></thead><tbody id="resBody"></tbody></table></div>
+</div>
+
+<div class="card">
+  <details class="box" id="adminBox">
+    <summary>기록 관리 (기록 파일 올리기 · 검색 · 삭제)</summary>
+    <p class="hint">처음 한 번은 그동안 쌓은 기록 CSV(대분류, 카테고리, 상품ID, 상품명)를 올려 주세요. 같은 상품ID가 이미 있으면 새 값으로 바뀝니다.</p>
+    <div class="actions">
+      <input type="file" id="importFile" accept=".csv,.txt">
+      <button class="btn" id="importBtn" disabled>기록 올리기</button>
+    </div>
+    <div id="importMsg"></div>
+    <div class="actions" style="margin-top:18px">
+      <input type="text" id="search" placeholder="상품ID 또는 상품명으로 검색" style="flex:1; min-width:240px">
+    </div>
+    <div id="searchOut"></div>
+  </details>
+</div>
+
+<datalist id="catList"></datalist>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  /* ===== 분류 엔진 (ENGINE START) =====
+     상품명 → 단어·붙여 쓴 단어(바이그램) + 글자 2~3개 묶음으로 나눠 TF-IDF 유사도를 구하고,
+     상위 10개 비슷한 기록으로 카테고리 투표를 해서 후보 3개를 고릅니다. */
+  var Engine = (function(){
+    var PROMO = /(무료배송|당일발송|당일출고|빠른배송|특가|할인|신상|증정|사은품|MD추천|베스트|인기|신제품|한정|리뉴얼|패키지)/g;
+    function pre(s){
+      return String(s || "")
+        .replace(/\[.*?\]/g, " ").replace(/\(.*?\)/g, " ").replace(/\d+\+\d+/g, " ")
+        .replace(/[★☆♥♡◆◇■□●○▶▷】【]/g, " ").replace(PROMO, " ")
+        .replace(/\s+/g, " ").trim();
+    }
+    function wordFeats(s){
+      var c = pre(s).toLowerCase().replace(/[^가-힣a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+      var t = c ? c.split(" ") : [], out = t.slice();
+      for(var i = 0; i < t.length - 1; i++) out.push(t[i] + t[i + 1]);
+      return out;
+    }
+    function charFeats(s){
+      var words = pre(s).toLowerCase().split(/\s+/).filter(Boolean), out = [];
+      words.forEach(function(w){
+        var p = " " + w + " ";
+        for(var n = 2; n <= 3; n++) for(var i = 0; i + n <= p.length; i++) out.push(p.substr(i, n));
+      });
+      return out;
+    }
+    var FEM = /여성|여자|우먼|우먼즈|women|woman|girls|girl|레이디|ladies/i;
+    var MAL = /남성|남자|맨|맨즈|men|man|boys|boy/i;
+    function gender(s){ var c = pre(s); return FEM.test(c) ? 1 : MAL.test(c) ? -1 : 0; }
+
+    function counts(arr){ var m = new Map(); arr.forEach(function(f){ m.set(f, (m.get(f) || 0) + 1); }); return m; }
+
+    // 기록 목록으로 색인 만들기. recs: [{id, big, cat, name}]
+    function build(recs){
+      var N = recs.length;
+      var blocks = [wordFeats, charFeats].map(function(fx){
+        var docs = recs.map(function(r){ return counts(fx(r.name)); });
+        var df = new Map();
+        docs.forEach(function(m){ m.forEach(function(_, f){ df.set(f, (df.get(f) || 0) + 1); }); });
+        var idf = new Map();
+        df.forEach(function(d, f){ idf.set(f, Math.log((1 + N) / (1 + d)) + 1); });
+        var post = new Map();
+        docs.forEach(function(m, di){
+          var w = [], norm = 0;
+          m.forEach(function(tf, f){ var v = (1 + Math.log(tf)) * idf.get(f); w.push([f, v]); norm += v * v; });
+          norm = Math.sqrt(norm) || 1;
+          w.forEach(function(p){
+            var l = post.get(p[0]); if(!l){ l = []; post.set(p[0], l); }
+            l.push(di, p[1] / norm);
+          });
+        });
+        return { fx: fx, idf: idf, post: post };
+      });
+      var byId = new Map();
+      recs.forEach(function(r, i){ if(r.id) byId.set(String(r.id), i); });
+      return { recs: recs, N: N, blocks: blocks, genders: recs.map(function(r){ return gender(r.name); }), byId: byId };
+    }
+
+    // 상품 하나 분류 → { exact, cands:[{big, cat, score, example}] }
+    function classify(ix, name, id){
+      if(id && ix.byId.has(String(id))){
+        var r = ix.recs[ix.byId.get(String(id))];
+        return { exact: true, cands: [{ big: r.big, cat: r.cat, score: 1, example: r.name }] };
+      }
+      var score = new Float32Array(ix.N);
+      ix.blocks.forEach(function(b){
+        var q = counts(b.fx(name)), w = [], norm = 0;
+        q.forEach(function(tf, f){ var idf = b.idf.get(f); if(!idf) return; var v = (1 + Math.log(tf)) * idf; w.push([f, v]); norm += v * v; });
+        norm = Math.sqrt(norm);
+        if(!norm) return;
+        w.forEach(function(p){
+          var l = b.post.get(p[0]), qv = p[1] / norm * 0.5;
+          for(var k = 0; k < l.length; k += 2) score[l[k]] += qv * l[k + 1];
+        });
+      });
+      var g = gender(name);
+      if(g) for(var i = 0; i < ix.N; i++){ if(ix.genders[i]) score[i] += 0.05 * g * ix.genders[i]; }
+      // 상위 10개
+      var top = [];
+      for(var j = 0; j < ix.N; j++){
+        var s = score[j];
+        if(top.length < 10 || s > top[top.length - 1][1]){
+          top.push([j, s]); top.sort(function(a, b){ return b[1] - a[1]; }); if(top.length > 10) top.pop();
+        }
+      }
+      // 상위 5개로 투표해서 1등, 나머지는 점수 순으로 다른 카테고리
+      var votes = new Map();
+      top.slice(0, 5).forEach(function(t){
+        var r = ix.recs[t[0]], key = r.big + "\u0001" + r.cat, v = votes.get(key);
+        if(!v){ v = { big: r.big, cat: r.cat, vote: 0, score: t[1], example: r.name }; votes.set(key, v); }
+        v.vote += Math.max(t[1], 0) * Math.max(t[1], 0);
+      });
+      var cands = Array.from(votes.values()).sort(function(a, b){ return b.vote - a.vote; });
+      top.forEach(function(t){
+        if(cands.length >= 3) return;
+        var r = ix.recs[t[0]];
+        if(!cands.some(function(c){ return c.big === r.big && c.cat === r.cat; })) cands.push({ big: r.big, cat: r.cat, score: t[1], example: r.name });
+      });
+      return { exact: false, cands: cands.slice(0, 3).map(function(c){ return { big: c.big, cat: c.cat, score: Math.max(0, Math.min(1, c.score)), example: c.example }; }) };
+    }
+    return { build: build, classify: classify, pre: pre };
+  })();
+  /* ===== ENGINE END ===== */
+
+  /* ===== 화면 ===== */
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function fmtN(n){ return Number(n).toLocaleString("ko-KR"); }
+  function say(id, kind, title, items){
+    if(!kind){ $(id).innerHTML = ""; return; }
+    var h = '<div class="msg ' + kind + '">' + title;
+    if(items && items.length) h += "<ul><li>" + items.join("</li><li>") + "</li></ul>";
+    $(id).innerHTML = h + "</div>";
+  }
+  function setStatus(t, err){ $("status").textContent = t; $("status").className = "status" + (err ? " err" : ""); }
+
+  /* ===== Supabase ===== */
+  var TABLE = "category_records";
+  function configured(){ return typeof SUPABASE_URL !== "undefined" && typeof SUPABASE_KEY !== "undefined" && SUPABASE_URL && SUPABASE_KEY && !/^PASTE_/.test(SUPABASE_KEY); }
+  async function sb(path, opts){
+    opts = opts || {};
+    var base = SUPABASE_URL.replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+    var auth = { apikey: SUPABASE_KEY };
+    if(!/^sb_/.test(SUPABASE_KEY)) auth.Authorization = "Bearer " + SUPABASE_KEY;
+    var res = await fetch(base + "/rest/v1/" + path, Object.assign({}, opts, { headers: Object.assign({ "Content-Type":"application/json" }, auth, opts.headers || {}) }));
+    if(!res.ok){ var t = ""; try{ t = await res.text(); }catch(e){} throw new Error("HTTP " + res.status + (t ? " · " + t.slice(0, 200) : "")); }
+    var txt = await res.text();
+    return txt ? JSON.parse(txt) : null;
+  }
+  async function loadAll(){
+    var out = [], step = 1000;
+    for(var off = 0; ; off += step){
+      var part = await sb(TABLE + "?select=product_id,big_category,category,product_name&order=id.asc&limit=" + step + "&offset=" + off);
+      out = out.concat(part || []);
+      setStatus("기록을 불러오는 중입니다… " + fmtN(out.length) + "건");
+      if(!part || part.length < step) break;
+    }
+    return out;
+  }
+  async function upsert(rows, onProgress){
+    var now = new Date().toISOString(), withId = [], noId = [];
+    rows.forEach(function(r){
+      var x = { product_id: r.id || null, big_category: r.big, category: r.cat, product_name: r.name, source: r.source || "manual", updated_at: now };
+      (x.product_id ? withId : noId).push(x);
+    });
+    var done = 0, size = 500;
+    for(var i = 0; i < withId.length; i += size){
+      await sb(TABLE + "?on_conflict=product_id", { method:"POST", headers:{ Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(withId.slice(i, i + size)) });
+      done += Math.min(size, withId.length - i); if(onProgress) onProgress(done, rows.length);
+    }
+    for(var j = 0; j < noId.length; j += size){
+      await sb(TABLE, { method:"POST", headers:{ Prefer:"return=minimal" }, body: JSON.stringify(noId.slice(j, j + size)) });
+      done += Math.min(size, noId.length - j); if(onProgress) onProgress(done, rows.length);
+    }
+  }
+
+  /* ===== 기록 상태 ===== */
+  var RECS = [], IX = null, BIGS = [], ONLINE = false;
+  async function reload(){
+    if(!configured()){ setStatus("assets/config.js에 Supabase 접속 정보가 없습니다.", true); return; }
+    try{
+      var rows = await loadAll();
+      RECS = rows.map(function(r){ return { id: r.product_id, big: r.big_category, cat: r.category, name: r.product_name }; });
+      ONLINE = true;
+      setStatus("기록 " + fmtN(RECS.length) + "건으로 색인을 만드는 중입니다…");
+      await new Promise(function(r){ setTimeout(r, 20); });
+      IX = RECS.length ? Engine.build(RECS) : null;
+      var bigs = {}, cats = {};
+      RECS.forEach(function(r){ bigs[r.big] = (bigs[r.big] || 0) + 1; cats[r.cat] = true; });
+      BIGS = Object.keys(bigs).sort(function(a, b){ return bigs[b] - bigs[a]; });
+      $("catList").innerHTML = Object.keys(cats).sort().map(function(c){ return "<option value=\"" + esc(c) + "\">"; }).join("");
+      setStatus(RECS.length ? "기록 " + fmtN(RECS.length) + "건을 불러왔습니다." : "아직 기록이 없습니다. 아래 기록 관리에서 기록 CSV를 먼저 올려 주세요.", !RECS.length);
+      if(!RECS.length) $("adminBox").open = true;
+    }catch(e){
+      console.error(e); ONLINE = false; IX = null;
+      setStatus("기록을 불러오지 못했습니다 (" + (e && e.message ? e.message : e) + "). Supabase 연결을 확인해 주세요.", true);
+    }
+    updateRun();
+  }
+
+  /* ===== 입력 ===== */
+  function parseInput(text){
+    return String(text).split(/\r?\n/).map(function(line){
+      var raw = line.replace(/\s+$/, ""); if(!raw.trim()) return null;
+      var cells = raw.split("\t").map(function(c){ return c.trim(); }).filter(function(c){ return c !== ""; });
+      var id = "", name = "";
+      if(cells.length >= 2 && /^\d{5,}$/.test(cells[0].replace(/\.0+$/, ""))){ id = cells[0].replace(/\.0+$/, ""); name = cells.slice(1).join(" "); }
+      else{
+        var m = raw.trim().match(/^(\d{5,})\s+(.+)$/);
+        if(m){ id = m[1]; name = m[2]; } else name = raw.trim();
+      }
+      return { id: id, name: name };
+    }).filter(Boolean);
+  }
+  function updateRun(){
+    var n = parseInput($("input").value).length;
+    $("inCount").textContent = fmtN(n) + "개";
+    $("run").disabled = !(IX && n);
+    $("importBtn").disabled = !(ONLINE && $("importFile").files.length);
+  }
+  $("input").addEventListener("input", updateRun);
+
+  /* ===== 분류 ===== */
+  var RES = [];   // [{id, name, exact, cands, sel(0~2 | "m"), mBig, mCat}]
+  $("run").onclick = function(){
+    var items = parseInput($("input").value);
+    RES = items.map(function(it){
+      var r = Engine.classify(IX, it.name, it.id);
+      return { id: it.id, name: it.name, exact: r.exact, cands: r.cands, sel: 0, mBig: "", mCat: "" };
+    });
+    say("resMsg");
+    renderRes();
+    $("resultCard").hidden = false;
+    $("resultCard").scrollIntoView({ behavior:"smooth", block:"start" });
+  };
+
+  function chosen(r){
+    if(r.sel === "m") return { big: r.mBig.trim(), cat: r.mCat.trim() };
+    var c = r.cands[r.sel]; return c ? { big: c.big, cat: c.cat } : { big:"", cat:"" };
+  }
+  function stateTag(r){
+    if(r.sel === "m") return "<span class='tag edit'>직접 입력</span>";
+    if(r.exact) return "<span class='tag rec'>기록 일치</span>";
+    if(r.sel !== 0) return "<span class='tag pick'>후보 선택</span>";
+    return "<span class='tag auto'>자동 1등</span>";
+  }
+  function renderRes(){
+    var bigOpts = BIGS.map(function(b){ return "<option>" + esc(b) + "</option>"; }).join("");
+    $("resBody").innerHTML = RES.map(function(r, i){
+      var low = !r.exact && r.cands[0] && r.cands[0].score < 0.3;
+      var cands = r.cands.map(function(c, k){
+        return "<label class='cand" + (r.sel === k ? " on" : "") + "'><input type='radio' name='s" + i + "' data-i='" + i + "' data-k='" + k + "'" + (r.sel === k ? " checked" : "") + ">" +
+          "<span class='path'><b>" + esc(c.big) + "</b> › " + esc(c.cat) + "<span class='meta'>" + (r.exact ? "같은 상품ID 기록" : Math.round(c.score * 100) + "% · 비슷한 상품: " + esc(c.example)) + "</span></span></label>";
+      }).join("");
+      var manual = "<label class='cand" + (r.sel === "m" ? " on" : "") + "'><input type='radio' name='s" + i + "' data-i='" + i + "' data-k='m'" + (r.sel === "m" ? " checked" : "") + ">" +
+        "<span class='path' style='flex:1'>직접 입력<span class='manual'><select data-i='" + i + "' data-f='mBig'><option value=''>대분류</option>" + bigOpts + "</select>" +
+        "<input type='text' list='catList' data-i='" + i + "' data-f='mCat' placeholder='카테고리 전체 경로' value='" + esc(r.mCat) + "'></span></span></label>";
+      return "<tr class='" + (low ? "low" : "") + "' id='row" + i + "'><td>" + (i + 1) + "</td><td class='name'>" + esc(r.name) + (r.id ? "<small>" + esc(r.id) + "</small>" : "") + "</td>" +
+        "<td><div class='cands'>" + cands + manual + "</div></td><td id='st" + i + "'>" + stateTag(r) + "</td></tr>";
+    }).join("");
+    RES.forEach(function(r, i){ var s = document.querySelector("select[data-i='" + i + "']"); if(s) s.value = r.mBig; });
+  }
+  $("resBody").addEventListener("change", function(e){
+    var t = e.target, i = Number(t.dataset.i); if(isNaN(i)) return;
+    var r = RES[i];
+    if(t.type === "radio"){ r.sel = t.dataset.k === "m" ? "m" : Number(t.dataset.k); }
+    else if(t.dataset.f){ r[t.dataset.f] = t.value; r.sel = "m";
+      if(t.dataset.f === "mCat" && !r.mBig){ var hit = BIGS.find(function(b){ return t.value.indexOf(b + "/") === 0 || t.value === b; }); if(hit){ r.mBig = hit; } }
+    }
+    var row = $("row" + i);
+    row.querySelectorAll(".cand").forEach(function(l){ var inp = l.querySelector("input[type=radio]"); var on = (inp.dataset.k === "m" ? "m" : Number(inp.dataset.k)) === r.sel; l.classList.toggle("on", on); inp.checked = on; });
+    var sel = row.querySelector("select[data-f='mBig']"); if(sel) sel.value = r.mBig;
+    $("st" + i).innerHTML = stateTag(r);
+  });
+  $("resBody").addEventListener("input", function(e){
+    var t = e.target; if(t.dataset && t.dataset.f === "mCat"){ var i = Number(t.dataset.i); RES[i].mCat = t.value; if(RES[i].sel !== "m"){ RES[i].sel = "m"; t.dispatchEvent(new Event("change", { bubbles:true })); } }
+  });
+
+  async function copyResult(){
+    var miss = [];
+    var tsv = RES.map(function(r, i){ var c = chosen(r); if(!c.big || !c.cat) miss.push(i + 1); return c.big + "\t" + c.cat; }).join("\n");
+    if(miss.length){ say("resMsg", "warn", "직접 입력을 골랐는데 대분류나 카테고리가 비어 있는 행이 있습니다: " + miss.join(", ") + "번"); return null; }
+    try{ await navigator.clipboard.writeText(tsv); }catch(e){ say("resMsg", "warn", "복사하지 못했습니다. 브라우저가 클립보드를 막았을 수 있습니다."); return null; }
+    return true;
+  }
+  $("copyOnly").onclick = async function(){ if(await copyResult()) say("resMsg", "ok", fmtN(RES.length) + "행을 복사했습니다. 기록에는 저장하지 않았습니다."); };
+  $("copySave").onclick = async function(){
+    if(!(await copyResult())) return;
+    // 기록과 똑같은 결과(같은 상품ID 기록을 그대로 쓴 행)는 다시 저장하지 않음
+    var save = RES.filter(function(r){ return !(r.exact && r.sel === 0); }).map(function(r){ var c = chosen(r); return { id: r.id, big: c.big, cat: c.cat, name: r.name, source: "manual" }; });
+    if(!save.length){ say("resMsg", "ok", fmtN(RES.length) + "행을 복사했습니다. 모두 기존 기록과 같아서 새로 저장할 것은 없습니다."); return; }
+    say("resMsg", "load", "복사했습니다. 기록에 저장하는 중입니다…");
+    $("copySave").disabled = true;
+    try{
+      await upsert(save);
+      say("resMsg", "ok", fmtN(RES.length) + "행을 복사했고, " + fmtN(save.length) + "건을 기록에 저장했습니다. 다음 분류부터 반영됩니다.");
+      await reload();
+    }catch(e){
+      console.error(e);
+      say("resMsg", "warn", "복사는 했지만 기록 저장에 실패했습니다: " + esc(e && e.message ? e.message : e));
+    }finally{ $("copySave").disabled = false; }
+  };
+
+  /* ===== 기록 올리기 ===== */
+  async function readText(file){
+    var buf = await file.arrayBuffer();
+    try{ return new TextDecoder("utf-8", { fatal:true }).decode(buf).replace(/^\uFEFF/, ""); }
+    catch(e){ return new TextDecoder("euc-kr").decode(buf).replace(/^\uFEFF/, ""); }
+  }
+  function parseCSV(text){
+    var rows = [], row = [], f = "", q = false, i = 0, c;
+    for(; i < text.length; i++){
+      c = text[i];
+      if(q){ if(c === '"'){ if(text[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+      else if(c === '"') q = true;
+      else if(c === ","){ row.push(f); f = ""; }
+      else if(c === "\n" || c === "\r"){ if(c === "\r" && text[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+      else f += c;
+    }
+    if(f !== "" || row.length){ row.push(f); rows.push(row); }
+    return rows;
+  }
+  $("importFile").addEventListener("change", updateRun);
+  $("importBtn").onclick = async function(){
+    var file = $("importFile").files[0]; if(!file) return;
+    try{
+      var rows = parseCSV(await readText(file));
+      var h = (rows[0] || []).map(function(x){ return String(x).trim(); });
+      var ix = { big: h.indexOf("대분류"), cat: h.indexOf("카테고리"), id: h.indexOf("상품ID"), name: h.indexOf("상품명") };
+      var start = 1;
+      if(ix.big < 0 || ix.cat < 0 || ix.name < 0){ ix = { big:0, cat:1, id:2, name:3 }; start = /대분류/.test(h.join("")) ? 1 : 0; }
+      var data = [], skip = 0;
+      for(var i = start; i < rows.length; i++){
+        var r = rows[i]; if(!r || r.length < 2) continue;
+        var x = { big: String(r[ix.big] || "").trim(), cat: String(r[ix.cat] || "").trim(), id: ix.id >= 0 ? String(r[ix.id] || "").trim().replace(/\.0+$/, "") : "", name: String(r[ix.name] || "").trim(), source: "import" };
+        if(!x.big || !x.cat || !x.name){ skip++; continue; }
+        data.push(x);
+      }
+      if(!data.length){ say("importMsg", "warn", "올릴 기록을 찾지 못했습니다. 대분류, 카테고리, 상품ID, 상품명 순서의 CSV인지 확인해 주세요."); return; }
+      if(!confirm(fmtN(data.length) + "건을 기록에 올립니다. 같은 상품ID가 이미 있으면 이 파일의 값으로 바뀝니다. 진행할까요?")) return;
+      $("importBtn").disabled = true;
+      await upsert(data, function(d, n){ say("importMsg", "load", "올리는 중입니다… " + fmtN(d) + " / " + fmtN(n)); });
+      say("importMsg", "ok", fmtN(data.length) + "건을 올렸습니다." + (skip ? " 빈 칸이 있는 " + fmtN(skip) + "행은 건너뛰었습니다." : ""));
+      $("importFile").value = "";
+      await reload();
+    }catch(e){
+      console.error(e);
+      say("importMsg", "warn", "올리지 못했습니다: " + esc(e && e.message ? e.message : e));
+    }finally{ updateRun(); }
+  };
+
+  /* ===== 검색·삭제 ===== */
+  var stimer = null;
+  $("search").addEventListener("input", function(){
+    clearTimeout(stimer);
+    stimer = setTimeout(function(){
+      var q = $("search").value.trim().toLowerCase();
+      if(!q){ $("searchOut").innerHTML = ""; return; }
+      var hits = RECS.filter(function(r){ return (r.id && String(r.id).indexOf(q) >= 0) || String(r.name).toLowerCase().indexOf(q) >= 0; }).slice(0, 50);
+      $("searchOut").innerHTML = hits.length ? "<div class='tablebox'><table><thead><tr><th>상품ID</th><th>상품명</th><th>대분류</th><th>카테고리</th><th></th></tr></thead><tbody>" +
+        hits.map(function(r){ return "<tr><td>" + esc(r.id || "-") + "</td><td>" + esc(r.name) + "</td><td>" + esc(r.big) + "</td><td>" + esc(r.cat) + "</td><td>" + (r.id ? "<button class='linkbtn' data-del='" + esc(r.id) + "'>삭제</button>" : "") + "</td></tr>"; }).join("") +
+        "</tbody></table></div><p class='count'>최대 50건까지 보여줍니다. 카테고리를 고치려면 분류하기에서 다시 골라 저장하면 같은 상품ID 기록이 바뀝니다.</p>" : "<p class='count'>찾는 기록이 없습니다.</p>";
+    }, 250);
+  });
+  $("searchOut").addEventListener("click", async function(e){
+    var id = e.target.dataset && e.target.dataset.del; if(!id) return;
+    if(!confirm("상품ID " + id + " 기록을 삭제할까요? 되돌릴 수 없습니다.")) return;
+    try{ await sb(TABLE + "?product_id=eq." + encodeURIComponent(id), { method:"DELETE" }); await reload(); $("search").dispatchEvent(new Event("input")); }
+    catch(err){ alert("삭제하지 못했습니다: " + (err && err.message ? err.message : err)); }
+  });
+
+  reload();
+})();
+</script>
+</body>
+</html>
