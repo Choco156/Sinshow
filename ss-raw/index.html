@@ -162,11 +162,12 @@ details.box[open] summary{margin-bottom:12px; color:var(--ink)}
 </div>
 
 <div class="card" id="needCard" hidden>
-  <h2>카테고리 입력이 필요한 상품</h2>
-  <p class="hint">SPO에만 있고 EP와 카테고리 기록에도 없는 상품입니다. 결괏값 시트 맨 아래에 카테고리(J·K열)가 비어 있습니다.</p>
+  <h2>SPO에만 있는 상품 (결괏값 하단)</h2>
+  <p class="hint">매체에는 없고 SPO에만 주문이 있는 상품입니다. 카테고리는 EP → 카테고리 기록 순서로 찾아 채우고, 둘 다 없는 상품만 “입력 필요”로 남깁니다.</p>
   <div class="actions">
-    <button class="btn primary" id="needSend">카테고리 분류 탭으로 보내기</button>
-    <button class="btn" id="needCopy">상품ID·상품명 복사</button>
+    <button class="btn primary" id="needSend">입력 필요 상품 분류하기</button>
+    <button class="btn" id="needCopy">입력 필요 상품ID·상품명 복사</button>
+    <span class="count" id="needSum"></span>
   </div>
   <div id="needMsg"></div>
   <div id="needList"></div>
@@ -911,7 +912,7 @@ document.querySelectorAll(".tab").forEach(function(t){ t.addEventListener("click
 
   /* ── 만들기 ── */
   /* ── 마지막으로 만든 파일 (카테고리 채워서 다시 받을 때 씀) ── */
-  var LAST = null;   // { sheets:[[이름, 2차원 배열]], res:결괏값 행, need:[행], name }
+  var LAST = null;   // { sheets:[[이름, 2차원 배열]], need:[입력 필요 행], spoOnly:[{row, src}], name }
   function writeBook(name){
     var wb = XLSX.utils.book_new();
     LAST.sheets.forEach(function(s){ XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s[1]), s[0]); });
@@ -921,11 +922,25 @@ document.querySelectorAll(".tab").forEach(function(t){ t.addEventListener("click
   function needRows(){ return LAST ? LAST.need.filter(function(r){ return !r[5] || !r[6]; }) : []; }
   function renderNeed(){
     var rows = needRows();
-    $("needCard").hidden = !rows.length;
     $("tabCnt").hidden = !rows.length; $("tabCnt").textContent = rows.length;
-    if(!rows.length){ $("needList").innerHTML = ""; return; }
-    $("needList").innerHTML = "<div class='tablebox'><table><thead><tr><th>행레이블</th><th>상품ID</th><th>상품명</th></tr></thead><tbody>" +
-      rows.map(function(r){ return "<tr><td>" + esc(r[0]) + "</td><td>" + esc(pidOf(r)) + "</td><td>" + esc(r[8]) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+    $("needCard").hidden = !LAST;
+    if(!LAST){ $("needList").innerHTML = ""; return; }
+    $("needSend").disabled = $("needCopy").disabled = !rows.length;
+    var all = LAST.spoOnly, c = { ep:0, rec:0, done:0, need:0 };
+    var list = all.map(function(x){
+      var st = x.src === "ep" ? "EP" : x.src === "rec" ? "기록으로 채움" : (x.row[5] && x.row[6]) ? "분류 완료" : "입력 필요";
+      c[x.src === "ep" ? "ep" : x.src === "rec" ? "rec" : st === "분류 완료" ? "done" : "need"]++;
+      return { r: x.row, st: st };
+    });
+    $("needSum").textContent = "총 " + all.length + "개 · EP " + c.ep + " · 기록으로 채움 " + c.rec + (c.done ? " · 분류 완료 " + c.done : "") + " · 입력 필요 " + c.need;
+    if(!all.length){ $("needList").innerHTML = "<p class='count' style='margin:12px 0 0'>SPO에만 있고 주문 있는 상품이 없습니다.</p>"; return; }
+    var order = { "입력 필요":0, "분류 완료":1, "기록으로 채움":2, "EP":3 };
+    list.sort(function(a, b){ return order[a.st] - order[b.st]; });
+    $("needList").innerHTML = "<div class='tablebox'><table><thead><tr><th>상태</th><th>행레이블</th><th>상품명</th><th>대분류</th><th>카테고리</th></tr></thead><tbody>" +
+      list.map(function(x){
+        var tag = x.st === "입력 필요" ? "<span class='badge bad'>입력 필요</span>" : x.st === "EP" ? "<span class='badge wait'>EP</span>" : "<span class='badge'>" + x.st + "</span>";
+        return "<tr><td>" + tag + "</td><td>" + esc(x.r[0]) + "</td><td style='white-space:normal'>" + esc(x.r[8]) + "</td><td>" + esc(x.r[5] || "") + "</td><td>" + esc(x.r[6] || "") + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
   }
   $("needCopy").onclick = async function(){
     var tsv = needRows().map(function(r){ return pidOf(r) + "\t" + r[8]; }).join("\n");
@@ -1031,7 +1046,9 @@ document.querySelectorAll(".tab").forEach(function(t){ t.addEventListener("click
     var d = same && vals[0] && /^\d{4}-/.test(vals[0]) ? vals[0].slice(2).replace(/-/g, "") : (S.media.PC.date || "").slice(2).replace(/-/g, "");
     var name = "쇼검RAW_" + (d || "날짜확인") + ".xlsx";
     // 1행은 원본 헤더, 2행부터 붙여넣을 데이터
-    LAST = { name: name, need: onlyOut, sheets: [
+    LAST = { name: name, need: onlyOut,
+      spoOnly: onlyIn.map(function(r){ return { row:r, src:"ep" }; }).concat(onlyRec.map(function(r){ return { row:r, src:"rec" }; }), onlyOut.map(function(r){ return { row:r, src:"need" }; })),
+      sheets: [
       ["매체_RAW", [S.media.PC.head].concat(media)],
       ["EP_RAW", [S.ep.head].concat(ep)],
       ["SPO_RAW", [S.spo.PC.head].concat(spo)],
