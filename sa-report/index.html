@@ -44,6 +44,8 @@
 .controls{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end}
 label.f{display:flex; flex-direction:column; gap:5px; font-size:13px; color:var(--muted); font-weight:500}
 label.f.wide{flex:1; min-width:280px}
+label.chk{display:flex; align-items:center; gap:7px; font-size:13.5px; color:var(--ink); cursor:pointer; padding:9px 4px; user-select:none}
+label.chk input{width:16px; height:16px; margin:0; accent-color:var(--accent); cursor:pointer}
 input[type=date], input[type=text], input[type=number], input[type=url], input[type=password], select{
   font:inherit; font-size:14px; color:var(--ink); background:var(--surface);
   border:1px solid var(--line); border-radius:7px; padding:7px 10px; min-width:0; width:100%;
@@ -120,6 +122,7 @@ ol.steps li{margin-bottom:6px}
       <label class="f">시작일<input type="date" id="dstart"></label>
       <label class="f">종료일<input type="date" id="dend"></label>
       <button class="btn" id="resetdate">어제 하루로</button>
+      <label class="chk"><input type="checkbox" id="gfull">구글은 파일 전체 기간 취합</label>
     </div>
     <div class="foot" id="rangeinfo"></div>
   </div>
@@ -403,7 +406,7 @@ drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preven
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add("over");}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove("over");}));
 drop.addEventListener("drop", e=>handleFiles(e.dataTransfer.files));
-fileinput.addEventListener("change", e=>{ handleFiles(e.target.files); fileinput.value=""; });
+fileinput.addEventListener("change", e=>{ handleFiles(Array.from(e.target.files)); fileinput.value=""; });
 
 async function handleFiles(list){
   for(const f of list){
@@ -437,6 +440,8 @@ function renderFiles(){
 const dstart = document.getElementById("dstart"), dend = document.getElementById("dend");
 dstart.value = yesterday(); dend.value = yesterday();
 [dstart,dend].forEach(el=>el.addEventListener("change", build));
+const gfull = document.getElementById("gfull");
+gfull.addEventListener("change", build);
 document.getElementById("resetdate").onclick = ()=>{ dstart.value=yesterday(); dend.value=yesterday(); build(); };
 function autoRange(){
   const all = FILES.flatMap(f=>f.rows.map(r=>r.date)).filter(Boolean).sort();
@@ -455,11 +460,19 @@ function build(){
 
   const warnUnmapped = new Set(), warnRate = new Set();
   const agg = new Map();
+  const gAll = document.getElementById("gfull").checked;   // 체크하면 구글만 고른 기간 대신 파일 전체 날짜(오늘 제외)를 씀
+  let gMin = "", gMax = "";
 
   rows.forEach(r=>{
     if(!r.date || r.date >= cap) return;
-    if(s && r.date < s) return;
-    if(e && r.date > e) return;
+    const fullG = gAll && r.src === "구글";
+    if(!fullG){
+      if(s && r.date < s) return;
+      if(e && r.date > e) return;
+    } else {
+      if(!gMin || r.date < gMin) gMin = r.date;
+      if(!gMax || r.date > gMax) gMax = r.date;
+    }
     let key, cost;
     if(r.src === "브검"){
       key = r.raw;
@@ -495,7 +508,9 @@ function build(){
   }
 
   const h2 = document.createElement("h2"); h2.textContent = "붙여넣을 표";
-  const hint = document.createElement("p"); hint.className="hint"; hint.textContent = `${out.length}행 · ${s} ~ ${e}`;
+  const hint = document.createElement("p"); hint.className="hint"; hint.textContent = gAll
+    ? `${out.length}행 · 네이버·브검 ${s} ~ ${e} · 구글 ${gMin ? gMin + " ~ " + gMax + " (파일 전체)" : "데이터 없음"}`
+    : `${out.length}행 · ${s} ~ ${e}`;
   card.append(h2, hint);
 
   const tb = document.createElement("div"); tb.className="tablebox scrolly";
